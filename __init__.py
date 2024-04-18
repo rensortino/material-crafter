@@ -11,6 +11,7 @@ bl_info = {
 }
 
 MF_version = bl_info["version"]
+LAST_UPDATED = "Apr 16th 24"
 
 # TODO Make venv_path global
 # TODO Use pathlib
@@ -47,7 +48,7 @@ class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
     venv_path: bpy.props.StringProperty(
         name="Environment Path",
         description="The save path for the needed modules and the Stable Diffusion weights. If you have already "
-        "installed Cozy Auto Texture, or you are using a different version of Blender, you can use your"
+        "installed MatForger, or you are using a different version of Blender, you can use your"
         " old Environment Path. Regardless of the method, always initiate your Environment.",
         default=f"{helpers.current_drive}",
         maxlen=1024,
@@ -56,7 +57,7 @@ class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
 
     agree_to_license: bpy.props.BoolProperty(
         name="I agree",
-        description="I agree to the Cozy Auto Texture License and the Hugging Face Stable Diffusion License.",
+        description="I agree to the MatForger License and the Hugging Face Stable Diffusion License.",
     )
 
 
@@ -91,7 +92,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         # Importing dependencies
         try:
-            helpers.install_and_import_module(venv_path=venv_path)
+            helpers.install_modules(venv_path=venv_path)
 
             print("Python modules installed successfully.")
         except (subprocess.CalledProcessError, ImportError) as err:
@@ -121,8 +122,8 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         helpers.set_dependencies_installed(True)
 
-        for cls in classes:
-            bpy.utils.register_class(cls)
+        # for cls in classes:
+        #     bpy.utils.register_class(cls)
 
         bpy.types.Scene.input_tool = bpy.props.PointerProperty(
             type=MF_PGT_Input_Properties
@@ -404,7 +405,7 @@ def register():
         type=MF_PGT_Input_Properties_Pre
     )
 
-    if helpers.read_path_log(check_exists=True):
+    if helpers.path_log_exists():
         environment_path = helpers.read_path_log()["environment_path"]
         venv_path = os.path.join(environment_path, "venv")
 
@@ -417,10 +418,11 @@ def register():
             type=MF_PGT_Input_Properties
         )
 
-        helpers.import_modules(venv_path)
         helpers.set_dependencies_installed(True)
+        helpers.import_modules(venv_path)
         return
 
+    helpers.import_modules(venv_path)
     helpers.set_dependencies_installed(False)
     return
 

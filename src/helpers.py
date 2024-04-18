@@ -8,13 +8,16 @@ import site
 from collections import namedtuple
 
 
-current_drive = os.path.join(pathlib.Path.home().drive, os.sep)
 
-model_id = "stabilityai/stable-diffusion-2"
+model_id = "gvecchio/MatForger"
 
 directory = os.path.dirname(os.path.realpath(__file__))
 path_log = os.path.join(directory, "..", "path_log.json")
 
+def path_log_exists() -> bool:
+    return os.path.exists(path_log) and os.path.isfile(path_log)
+
+current_drive = path_log if path_log_exists() else os.path.join(pathlib.Path.home().drive, os.sep)
 # Dependencies
 
 # Declare all modules that this add-on depends on, that may need to be installed. The package and (global) name can be
@@ -22,12 +25,13 @@ path_log = os.path.join(directory, "..", "path_log.json")
 # of the arguments. DO NOT use this to import other parts of this Python add-on, see "Local modules" above for examples.
 
 dependence_dict = {
+        "pywin32": [],
         "fire": [],
         "numpy": [],
         "diffusers": [],
         "transformers": [],
         "accelerate": [],
-        "torch==1.12.1+cu116": ["-f", "https://download.pytorch.org/whl/torch_stable.html"],
+        "torch==2.2.2+cu121": ["--index-url", "https://download.pytorch.org/whl/cu121"],
 }
 
 Dependency = namedtuple("Dependency", ["module", "name", "extra_params"])
@@ -80,7 +84,7 @@ def install_pip():
         ensurepip.bootstrap()
         os.environ.pop("PIP_REQ_TRACKER", None)
 
-def install_and_import_module(venv_path: str, ):
+def install_modules(venv_path: str, ):
     """
     Installs the package through pip and will attempt to import modules into the Venv, or if make_global = True import
     them globally.
@@ -141,19 +145,45 @@ def install_and_import_module(venv_path: str, ):
                     subprocess.run(
                             install_commands_list,
                             check=True,
+                            env=environ_copy
                     )
                 except subprocess.CalledProcessError as e:
                     print(f"Exception occurred while installing {dependency.module_name}: \n\n{e}")
 
 
-
-def read_path_log(check_exists: bool=False):
-    if check_exists:
-        return os.path.exists(path_log) and os.path.isfile(path_log)
-    if os.path.exists(path_log) and os.path.isfile(path_log):
+def read_path_log():
+    if path_log_exists():
         return json.load(open(path_log))
     
 
 def import_modules(venv_path: str):
     site_packages_path = os.path.join(venv_path, "Lib", "site-packages")
     sys.path.insert(0, site_packages_path) #HACK Ugly but working way to import installed packages
+
+
+def show_blender_system_console():
+    import win32gui
+
+    def enum_windows_callback(hwnd, results):
+        class_name = win32gui.GetClassName(hwnd)
+        if class_name == "ConsoleWindowClass":
+            results.append((hwnd, win32gui.GetWindowText(hwnd)))
+
+    windows = []
+    win32gui.EnumWindows(enum_windows_callback, windows)
+
+    for hwnd, title in windows:
+        if title=="":
+            break
+
+    print(f"The Blender console window is {hwnd}")
+
+    # Check if the window is visible or hidden
+    is_visible = win32gui.IsWindowVisible(hwnd)
+
+    if is_visible:
+        print("The window is visible.")
+        win32gui.SetForegroundWindow(hwnd)
+    else:
+        print("The window is hidden.")
+        bpy.ops.wm.console_toggle()
