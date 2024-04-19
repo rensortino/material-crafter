@@ -13,6 +13,8 @@ bl_info = {
 MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 16th 24"
 
+#TODO Add automatic texture loading
+
 # TODO Make venv_path global
 
 # Blender modules:
@@ -84,6 +86,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         # Install pip:
         helpers.install_pip()
+        self.report({"INFO"}, "PIP installed.")
 
         # Install Venv:
         if not venv_path.exists():
@@ -93,7 +96,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         try:
             helpers.install_modules(venv_path=venv_path)
 
-            print("Python modules installed successfully.")
+            self.report({"INFO"}, "Python modules installed successfully.")
         except (subprocess.CalledProcessError, ImportError) as err:
             self.report({"ERROR"}, str(err))
             return {"CANCELLED"}
@@ -110,14 +113,14 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
             pipe = StableDiffusionPipeline.from_pretrained(
                 model_id, scheduler=scheduler, torch_dtype=torch.float16
             )
-            print("Stable Diffusion successfully installed.")
+            self.report({"INFO"}, "Stable Diffusion successfully installed.")
             pass
 
         except Exception as err:
             self.report({"ERROR"}, str(err))
             return {"CANCELLED"}
 
-        print("Dependencies installed successfully")
+        self.report({"INFO"}, "Dependencies installed successfully")
 
         helpers.set_dependencies_installed(True)
 
@@ -231,22 +234,22 @@ pre_dependency_classes = (
 # ======== User input Property Group ======== #
 class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
-    name: bpy.props.StringProperty(
-        name="Name", description="Name to reference the created texture"
+    dir_name: bpy.props.StringProperty(
+        name="Dir Name", description="Name of the generated texture"
     )
 
     prompt: bpy.props.StringProperty(
-        name="Prompt", description="Input prompt to generate the texture"
+        name="Prompt", description="Text prompt to generate the texture"
     )
 
-    format: bpy.props.EnumProperty(
-        name="Format",
-        description="Select texture file format",
-        items=[
-            (".png", ".png", "Export texture as .png"),
-            (".jpg", ".jpg", "Export texture as .jpg"),
-        ],
-    )
+    # format: bpy.props.EnumProperty(
+    #     name="Format",
+    #     description="Select texture file format",
+    #     items=[
+    #         (".png", ".png", "Export texture as .png"),
+    #         (".jpg", ".jpg", "Export texture as .jpg"),
+    #     ],
+    # )
 
     save_path: bpy.props.StringProperty(
         name="Save Path",
@@ -267,7 +270,36 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
     fp16: bpy.props.BoolProperty(
         name="Half Precision (FP16)",
+        default=True,
         description="Choose whether to run the model with half precision to use less memory.",
+    )
+
+    guidance_scale: bpy.props.FloatProperty(
+        name="Guidance Scale",
+        default=6.0,
+        step=0.1,
+        description="Classifier-free Guidance scale factor.",
+    )
+
+    height: bpy.props.IntProperty(
+        name="Height",
+        default=512,
+        step=32,
+        description="Height of the generated textures (higher sizes consume more memory).",
+    )
+    
+    width: bpy.props.IntProperty(
+        name="Width",
+        default=512,
+        step=32,
+        description="Width of the generated textures (higher sizes consume more memory).",
+    )
+
+    num_steps: bpy.props.IntProperty(
+        name="Steps",
+        default=25,
+        step=5,
+        description="Number of diffusion sampling steps.",
     )
 
 
@@ -290,32 +322,31 @@ class CreateTextures(bpy.types.Operator):
             "name": bpy.context.scene.input_tool.name,
             "prompt": bpy.context.scene.input_tool.prompt,
             "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
-            "format": bpy.context.scene.input_tool.format,
             "model_path": model_id,
             "fp16": bpy.context.scene.input_tool.fp16,
             "device": bpy.context.scene.input_tool.device,
         }
-
+        
+        sd_kwargs = {
+            "guidance_scale": bpy.context.scene.input_tool.guidance_scale,
+            "height": bpy.context.scene.input_tool.height,
+            "width": bpy.context.scene.input_tool.width,
+            "num_inference_steps": bpy.context.scene.input_tool.num_steps,
+            #TODO Add scheduler selection 
+        }
+ 
         if not user_input["save_path"]:
             user_input["save_path"] = tempfile.gettempdir()
         if user_input["save_path"] == "/tmp\\":
             user_input["save_path"] = tempfile.gettempdir()
-
-        # text2img(
-        #     user_input["prompt"],
-        #     user_input["save_path"],
-        #     user_input["format"],
-        #     user_input["model_path"],
-        #     user_input["device"],
-        # )
         
         try:
-            helpers.execution_handler(venv_path, "text2img", user_input)
+            helpers.execution_handler(venv_path, "text2img", {**user_input, **sd_kwargs})
+            self.report({"INFO"}, f"Texture(s) Created!")
         except subprocess.CalledProcessError as e:
-            print("MatForger execution raised an exception:\n {e}")
+            self.report({"ERROR"}, "MatForger execution raised an exception:\n {e}")
             self.report({"ERROR"}, e)
             return {"ERROR"}
-        self.report({"INFO"}, f"Texture(s) Created!")
         return {"FINISHED"}
 
 
@@ -337,9 +368,6 @@ class MF_PT_Main(bpy.types.Panel):
         """
 
         row = layout.row()
-        row.prop(input_tool, "name")
-
-        row = layout.row()
         row.prop(input_tool, "prompt")
 
         row = layout.row()
@@ -358,6 +386,9 @@ class MF_PT_Main(bpy.types.Panel):
 
         row = layout.row()
         row.prop(input_tool, "save_path")
+        
+        row = layout.row()
+        row.prop(input_tool, "dir_name")
 
         layout.separator()
 
@@ -366,6 +397,20 @@ class MF_PT_Main(bpy.types.Panel):
         )
 
         layout.separator()
+        
+        header, body = layout.panel("Diffusion Parameters")
+        
+        row = body.row()
+        row.prop(input_tool, "guidance_scale")
+        
+        row = body.row()
+        row.prop(input_tool, "height")
+
+        row = body.row()
+        row.prop(input_tool, "width")
+
+        row = body.row()
+        row.prop(input_tool, "num_steps")
 
 
 class MF_PT_Help(bpy.types.Panel):
@@ -416,7 +461,6 @@ def register():
     bpy.types.Scene.input_tool_pre = bpy.props.PointerProperty(
         type=MF_PGT_Input_Properties_Pre
     )
-    
 
     if helpers.path_log_exists():
         environment_path = Path(helpers.read_path_log()["environment_path"])
@@ -433,6 +477,7 @@ def register():
 
         helpers.set_dependencies_installed(True)
         helpers.import_modules(venv_path)
+        # helpers.show_blender_system_console()
         # for dependency in helpers.dependencies:
         #     helpers.import_module(dependency.name)
         return

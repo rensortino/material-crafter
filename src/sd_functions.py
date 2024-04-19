@@ -10,10 +10,11 @@ class SDInterfaceCommands(object):
                 name: str,
                 prompt: str,
                 save_path: Path,
-                format: str,
                 model_path: str,
                 fp16: bool,
-                device: str):
+                device: str,
+                **kwargs
+                ):
         # img = Image.open(img_path)
         save_dir = Path(save_path) / name
         save_dir.mkdir(exist_ok=True, parents=True)
@@ -36,10 +37,11 @@ class SDInterfaceCommands(object):
             #TODO Parameterize all SD parameters
             image = pipe(
                 prompt,
-                guidance_scale=6.0,
-                height=256,
-                width=256,
-                num_inference_steps=25,
+                **kwargs
+                # guidance_scale=6.0,
+                # height=256,
+                # width=256,
+                # num_inference_steps=25,
             ).images[0]
             
         image.basecolor.save(save_dir / "basecolor.png")
@@ -47,12 +49,6 @@ class SDInterfaceCommands(object):
         image.height.save(save_dir / "height.png")
         image.roughness.save(save_dir / "roughness.png")
         image.metallic.save(save_dir / "metallic.png")
-        
-        # bpy.data.images.load(save_path / "basecolor.png", check_existing=False)
-        # bpy.data.images.load(save_path / "normal.png", check_existing=False)
-        # bpy.data.images.load(save_path / "height.png", check_existing=False)
-        # bpy.data.images.load(save_path / "roughness.png", check_existing=False)
-        # bpy.data.images.load(save_path / "metallic.png", check_existing=False)
     
 if __name__ == '__main__':
     fire.Fire(SDInterfaceCommands)

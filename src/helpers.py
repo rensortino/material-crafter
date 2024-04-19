@@ -30,7 +30,7 @@ current_drive = Path(read_path_log()['environment_path']).parent if path_log_exi
 # of the arguments. DO NOT use this to import other parts of this Python add-on, see "Local modules" above for examples.
 
 dependence_dict = {
-    "pywin32": {"name": "win32", "extra_params": []},
+    "pywin32==303": {"name": "win32", "extra_params": []},
     "fire": {"name": "fire", "extra_params": []},
     "numpy": {"name": "numpy", "extra_params": []},
     "diffusers": {"name": "diffusers", "extra_params": []},
