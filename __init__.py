@@ -14,20 +14,19 @@ MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 16th 24"
 
 # TODO Make venv_path global
-# TODO Use pathlib
 
 # Blender modules:
 import bpy
 
 # Python modules:
-import os
+from pathlib import Path
 import sys
 import tempfile
 import importlib
 import subprocess
 
 # Local modules:
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(Path(__file__).parent)
 
 from .src import helpers
 
@@ -75,10 +74,10 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
     def execute(self, context):
         # TODO: make asynchronous so that download progress is viewable from UI.
         # Paths:
-        environment_path = os.path.join(
-            bpy.context.scene.input_tool_pre.venv_path, "MatForger-Add-on"
+        environment_path = (
+            Path(bpy.context.scene.input_tool_pre.venv_path) / "MatForger-Add-on"
         )
-        venv_path = os.path.join(environment_path, "venv")
+        venv_path = environment_path / "venv"
         model_id = helpers.model_id
 
         helpers.create_path_log(path=environment_path, path_name="environment_path")
@@ -87,7 +86,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         helpers.install_pip()
 
         # Install Venv:
-        if not os.path.exists(venv_path):
+        if not venv_path.exists():
             subprocess.run([sys.executable, "-m", "venv", venv_path], check=True)
 
         # Importing dependencies
@@ -141,10 +140,10 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        environment_path = os.path.exists(
-            os.path.join(bpy.context.scene.input_tool_pre.venv_path, "MatForger-Add-on")
+        environment_path = (
+            Path(bpy.context.scene.input_tool_pre.venv_path) / "MatForger-Add-on"
         )
-        return not environment_path
+        return not environment_path.exists()
 
     def draw(self, context):
         layout = self.layout
@@ -266,6 +265,11 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         ],
     )
 
+    fp16: bpy.props.BoolProperty(
+        name="Half Precision (FP16)",
+        description="Choose whether to run the model with half precision to use less memory.",
+    )
+
 
 # ======== Operators ======== #
 class CreateTextures(bpy.types.Operator):
@@ -278,18 +282,17 @@ class CreateTextures(bpy.types.Operator):
         return context.window_manager.invoke_confirm(self, event)
 
     def execute(self, context):
-        from .src.sd_functions import text2img
-
         model_id = helpers.model_id
+        env_path = Path(helpers.read_path_log()['environment_path'])
+        venv_path = env_path / "venv"
 
         user_input = {
             "name": bpy.context.scene.input_tool.name,
             "prompt": bpy.context.scene.input_tool.prompt,
-            "save_path": os.path.abspath(
-                bpy.path.abspath(bpy.context.scene.input_tool.save_path)
-            ),
+            "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
             "format": bpy.context.scene.input_tool.format,
             "model_path": model_id,
+            "fp16": bpy.context.scene.input_tool.fp16,
             "device": bpy.context.scene.input_tool.device,
         }
 
@@ -298,14 +301,20 @@ class CreateTextures(bpy.types.Operator):
         if user_input["save_path"] == "/tmp\\":
             user_input["save_path"] = tempfile.gettempdir()
 
-        text2img(
-            user_input["prompt"],
-            user_input["save_path"],
-            user_input["format"],
-            user_input["model_path"],
-            user_input["device"],
-        )
-
+        # text2img(
+        #     user_input["prompt"],
+        #     user_input["save_path"],
+        #     user_input["format"],
+        #     user_input["model_path"],
+        #     user_input["device"],
+        # )
+        
+        try:
+            helpers.execution_handler(venv_path, "text2img", user_input)
+        except subprocess.CalledProcessError as e:
+            print("MatForger execution raised an exception:\n {e}")
+            self.report({"ERROR"}, e)
+            return {"ERROR"}
         self.report({"INFO"}, f"Texture(s) Created!")
         return {"FINISHED"}
 
@@ -338,6 +347,9 @@ class MF_PT_Main(bpy.types.Panel):
 
         row = layout.row()
         row.prop(input_tool, "format")
+        
+        row = layout.row()
+        row.prop(input_tool, "fp16")
 
         row = layout.row()
         row.prop(input_tool, "device")
@@ -404,10 +416,11 @@ def register():
     bpy.types.Scene.input_tool_pre = bpy.props.PointerProperty(
         type=MF_PGT_Input_Properties_Pre
     )
+    
 
     if helpers.path_log_exists():
-        environment_path = helpers.read_path_log()["environment_path"]
-        venv_path = os.path.join(environment_path, "venv")
+        environment_path = Path(helpers.read_path_log()["environment_path"])
+        venv_path = environment_path / "venv"
 
         # helpers.set_dependencies_installed(True)
 
@@ -420,6 +433,8 @@ def register():
 
         helpers.set_dependencies_installed(True)
         helpers.import_modules(venv_path)
+        # for dependency in helpers.dependencies:
+        #     helpers.import_module(dependency.name)
         return
 
     helpers.import_modules(venv_path)
@@ -439,5 +454,5 @@ def unregister():
     del bpy.types.Scene.input_tool_pre
 
 
-if __name__ == "__main__":
-    register()
+# if __name__ == "__main__":
+#     register()

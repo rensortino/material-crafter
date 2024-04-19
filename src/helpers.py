@@ -6,18 +6,23 @@ import subprocess
 import importlib
 import site
 from collections import namedtuple
-
+from pathlib import Path
 
 
 model_id = "gvecchio/MatForger"
 
-directory = os.path.dirname(os.path.realpath(__file__))
-path_log = os.path.join(directory, "..", "path_log.json")
+directory = Path(__file__).parent
+path_log = directory.parent / "path_log.json"
+
 
 def path_log_exists() -> bool:
-    return os.path.exists(path_log) and os.path.isfile(path_log)
+    return path_log.exists() and path_log.is_file()
 
-current_drive = path_log if path_log_exists() else os.path.join(pathlib.Path.home().drive, os.sep)
+def read_path_log():
+    if path_log_exists():
+        return json.load(open(path_log))
+
+current_drive = Path(read_path_log()['environment_path']).parent if path_log_exists() else (Path.home() / os.sep)
 # Dependencies
 
 # Declare all modules that this add-on depends on, that may need to be installed. The package and (global) name can be
@@ -25,33 +30,38 @@ current_drive = path_log if path_log_exists() else os.path.join(pathlib.Path.hom
 # of the arguments. DO NOT use this to import other parts of this Python add-on, see "Local modules" above for examples.
 
 dependence_dict = {
-        "pywin32": [],
-        "fire": [],
-        "numpy": [],
-        "diffusers": [],
-        "transformers": [],
-        "accelerate": [],
-        "torch==2.2.2+cu121": ["--index-url", "https://download.pytorch.org/whl/cu121"],
+    "pywin32": {"name": "win32", "extra_params": []},
+    "fire": {"name": "fire", "extra_params": []},
+    "numpy": {"name": "numpy", "extra_params": []},
+    "diffusers": {"name": "diffusers", "extra_params": []},
+    "transformers": {"name": "transformers", "extra_params": []},
+    "accelerate": {"name": "accelerate", "extra_params": []},
+    "torchvision": {"name": "torchvision", "extra_params": []},
+    "xformers": {"name": "xformers", "extra_params": []},
+    "torch==2.2.2+cu121": {"name": "torch", "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"]},
 }
 
 Dependency = namedtuple("Dependency", ["module", "name", "extra_params"])
-dependencies = [Dependency(module=i, name=None, extra_params=j) for i, j in dependence_dict.items()]
+dependencies = [
+    Dependency(module=i, name=j['name'], extra_params=j['extra_params']) for i, j in dependence_dict.items()
+]
 dependencies_installed = False
-
 
 
 def set_dependencies_installed(are_installed):
     global dependencies_installed
     dependencies_installed = are_installed
 
+
 def create_path_log(path: str, path_name=str):
     print(f"\n{path_log}\n")
     json_data = json.dumps({path_name: path}, indent=1, ensure_ascii=True)
 
-    with open(path_log, 'w') as outfile:
-        outfile.write(json_data + '\n')
+    with open(path_log, "w") as outfile:
+        outfile.write(json_data + "\n")
 
     return path_log
+
 
 # Returns true if dependency has been installed.
 def is_installed(dependency: str) -> bool:
@@ -63,6 +73,7 @@ def is_installed(dependency: str) -> bool:
         return importlib.util.find_spec(dependency) is not None
     finally:
         sys.path.remove(site.getusersitepackages())
+
 
 def install_pip():
     """
@@ -84,7 +95,10 @@ def install_pip():
         ensurepip.bootstrap()
         os.environ.pop("PIP_REQ_TRACKER", None)
 
-def install_modules(venv_path: str, ):
+
+def install_modules(
+    venv_path: str,
+):
     """
     Installs the package through pip and will attempt to import modules into the Venv, or if make_global = True import
     them globally.
@@ -104,7 +118,7 @@ def install_modules(venv_path: str, ):
     print(f"Installing dependencies: {''.join([i.module for i in dependencies])}")
 
     for dependency in dependencies:
-        module_name = dependency.module
+        module_name = dependency.name
         extra_params = dependency.extra_params
         make_global = False
 
@@ -126,11 +140,11 @@ def install_modules(venv_path: str, ):
         environ_copy["PYTHONNOUSERSITE"] = "1"
 
         install_commands_list = [
-                os.path.join(venv_path, "Scripts", "python"),
-                "-m",
-                "pip",
-                "install",
-                module_name
+            venv_path / "Scripts" / "python",
+            "-m",
+            "pip",
+            "install",
+            module_name,
         ]
 
         if extra_params:
@@ -140,29 +154,93 @@ def install_modules(venv_path: str, ):
             print(f"\nInstalling {module_name} to {venv_path}.\n")
             if is_installed(module_name):
                 print(f"Module {module_name} already installed.")
-            else: 
+            else:
                 try:
-                    subprocess.run(
-                            install_commands_list,
-                            check=True,
-                            env=environ_copy
-                    )
+                    subprocess.run(install_commands_list, check=True, env=environ_copy)
                 except subprocess.CalledProcessError as e:
-                    print(f"Exception occurred while installing {dependency.module_name}: \n\n{e}")
+                    print(
+                        f"Exception occurred while installing {dependency.module_name}: \n\n{e}"
+                    )
 
 
-def read_path_log():
-    if path_log_exists():
-        return json.load(open(path_log))
+def execution_handler(venv_path: str, operation_function: str, user_input: dict, output: bool = True):
+    """
+    In order for the Venv to work inside Blender, we must run the script as the Venv is activated
+    inside the actual 'activate.bat' file that Venv generates. This means that for each interaction with Stable Diffusion
+    we must input the commands into the activate.bat file, then run the file with Subprocess.
+
+    This file controls the interactions with the activate.bat file, it opens, modifies, and runs the files depending on
+    what functions are needed by MatForger. Each main function, when called, will activate Stable Diffusion with the
+    appropriate input variables.
+    """
+
+    activate_bat_path = venv_path / 'Scripts' / 'activate.bat'
+    python_exe_path = venv_path / 'Scripts' / 'python.exe'
+    drive = activate_bat_path.drive
+
+    sd_interface_path = directory / "sd_functions.py"
     
+    # for dependency in dependencies[1:]:
+    #     import_module(dependency.name)
+
+    # Get args from user_input:
+    args_string = " "
+    for arg_name, arg_value in user_input.items():  # user_input: {param_name: param_value}
+        args_string += f"""--{arg_name} "{arg_value}" """
+
+    commands = [
+            # f"""{drive}""",  # Triple quotes so we can include double quotes in commands.
+            f"""
+            "{python_exe_path}" "{sd_interface_path}" {operation_function}{args_string} 
+            """,  # NOTE: "operation_function" is the name of the function in sd_interface.py given to the command line.
+    ]
+
+    # Send commands to activate.bat
+    with open(activate_bat_path, "rt") as bat_in:
+        with open(activate_bat_path, "wt") as bat_out:
+            for line in bat_in:
+                bat_out.write(line)
+
+            for line in commands:
+                bat_out.write(f"\n{line}")
+
+    # Run activate.bat, activate Venv:
+    if output:
+        try:
+            output = subprocess.check_output(
+                    activate_bat_path.as_posix(),
+            )
+        except subprocess.CalledProcessError as e:
+            print(e.output)
+        return output
+    if not output:
+        subprocess.run(
+                activate_bat_path,
+        )
+
 
 def import_modules(venv_path: str):
-    site_packages_path = os.path.join(venv_path, "Lib", "site-packages")
-    sys.path.insert(0, site_packages_path) #HACK Ugly but working way to import installed packages
+    site_packages_path = venv_path / "Lib" / "site-packages"
+    sys.path.insert(
+        0, site_packages_path.as_posix()
+    )  # HACK Ugly but working way to import installed packages
 
+def import_module(module_name):
+    """
+    Import a module.
+    :param module_name: Module to import.
+    :raises: ImportError and ModuleNotFoundError
+    """
+
+    if module_name in globals():
+        importlib.reload(globals()[module_name])
+    else:
+        # Attempt to import the module and assign it to globals dictionary. This allows to access the module
+        # under the given name, just like the regular import would.
+        globals()[module_name] = importlib.import_module(module_name)
 
 def show_blender_system_console():
-    import win32gui
+    from win32 import win32gui
 
     def enum_windows_callback(hwnd, results):
         class_name = win32gui.GetClassName(hwnd)
@@ -173,7 +251,7 @@ def show_blender_system_console():
     win32gui.EnumWindows(enum_windows_callback, windows)
 
     for hwnd, title in windows:
-        if title=="":
+        if title == "":
             break
 
     print(f"The Blender console window is {hwnd}")
