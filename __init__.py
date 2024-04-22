@@ -1,25 +1,27 @@
 bl_info = {
     "name": "MatForger",
     "author": "Renato Sortino, Giuseppe Vecchio",
-    "version": (0, 0, 1),
-    "blender": (3, 2, 2),
+    "version": (1, 0, 0),
+    "blender": (4, 1, 0),
     "location": "View3D > Sidebar > MatForger",
-    "description": "Add on for generating textures.",
+    "description": "Add on for generating texture maps using diffusion models.",
     "support": "COMMUNITY",
-    "warning": "Requires installation of dependencies",
+    "warning": "Requires installation of dependencies and works best with a GPU",
     "category": "Development",
 }
 
 MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 16th 24"
 
-# TODO Define boundaries for input values.
 # TODO Enable texture creation only when an object is selected.
-#TODO Fix register bug
 #TODO Refactor
 # TODO Make venv_path global
 # FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
 
+def set_dependencies_installed(are_installed):
+    global dependencies_installed
+    dependencies_installed = are_installed
+    
 # Blender modules:
 import bpy
 
@@ -125,7 +127,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         self.report({"INFO"}, "Dependencies installed successfully")
 
-        helpers.set_dependencies_installed(True)
+        set_dependencies_installed(True)
 
         # for cls in classes:
         #     bpy.utils.register_class(cls)
@@ -281,6 +283,8 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         name="Guidance Scale",
         default=6.0,
         step=0.1,
+        max=20.0,
+        min=0.0,
         description="Classifier-free Guidance scale factor.",
     )
 
@@ -288,6 +292,8 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         name="Height",
         default=512,
         step=32,
+        min=128,
+        max=4096,
         description="Height of the generated textures (higher sizes consume more memory).",
     )
     
@@ -295,6 +301,8 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         name="Width",
         default=512,
         step=32,
+        min=128,
+        max=4096,
         description="Width of the generated textures (higher sizes consume more memory).",
     )
 
@@ -302,6 +310,8 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         name="Steps",
         default=25,
         step=5,
+        min=0,
+        max=1000,
         description="Number of diffusion sampling steps.",
     )
 
@@ -374,7 +384,7 @@ class MF_PT_Main(bpy.types.Panel):
         row.prop(input_tool, "prompt")
 
         row = layout.row()
-        row.label(text="*Input text for Stable Diffusion model.")
+        # row.label(text="*Input text for Stable Diffusion model.")
         
         row = layout.row()
         row.prop(input_tool, "fp16")
@@ -398,7 +408,11 @@ class MF_PT_Main(bpy.types.Panel):
 
         layout.separator()
         
-        header, body = layout.panel("Diffusion Parameters")
+        header, body = layout.panel("Diffusion Parameters", default_closed=False)
+        
+        # header.bl_id_name = "Diffusion Parameters"
+        row = header.row()
+        row.label(text="Diffusion Parameters")
         
         row = body.row()
         row.prop(input_tool, "guidance_scale")
@@ -463,6 +477,7 @@ def register():
     )
 
     if helpers.path_log_exists():
+        set_dependencies_installed(True)
         environment_path = Path(helpers.read_path_log()["environment_path"])
         venv_path = environment_path / "venv"
 
@@ -475,7 +490,6 @@ def register():
             type=MF_PGT_Input_Properties
         )
 
-        helpers.set_dependencies_installed(True)
         helpers.import_modules(venv_path)
         # helpers.show_blender_system_console()
         # for dependency in helpers.dependencies:
@@ -483,7 +497,7 @@ def register():
         return
 
     helpers.import_modules(venv_path)
-    helpers.set_dependencies_installed(False)
+    set_dependencies_installed(False)
     return
 
 
@@ -497,7 +511,3 @@ def unregister():
         del bpy.types.Scene.input_tool
 
     del bpy.types.Scene.input_tool_pre
-
-
-# if __name__ == "__main__":
-#     register()
