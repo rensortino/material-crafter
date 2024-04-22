@@ -7,6 +7,7 @@ import importlib
 import site
 from collections import namedtuple
 from pathlib import Path
+import bpy
 
 
 model_id = "gvecchio/MatForger"
@@ -30,7 +31,6 @@ current_drive = Path(read_path_log()['environment_path']).parent if path_log_exi
 # of the arguments. DO NOT use this to import other parts of this Python add-on, see "Local modules" above for examples.
 
 dependence_dict = {
-    "pywin32==303": {"name": "win32", "extra_params": []},
     "fire": {"name": "fire", "extra_params": []},
     "numpy": {"name": "numpy", "extra_params": []},
     "diffusers": {"name": "diffusers", "extra_params": []},
@@ -238,30 +238,65 @@ def import_module(module_name):
         # Attempt to import the module and assign it to globals dictionary. This allows to access the module
         # under the given name, just like the regular import would.
         globals()[module_name] = importlib.import_module(module_name)
+        
 
-def show_blender_system_console():
-    from win32 import win32gui
+def create_node(nodes, type, name, location=(0,0), hide=True, width=150):
+    new_node = nodes.new(type)
+    new_node.name = name
+    new_node.location = location
+    new_node.hide = hide
+    new_node.width = width
+    return new_node
 
-    def enum_windows_callback(hwnd, results):
-        class_name = win32gui.GetClassName(hwnd)
-        if class_name == "ConsoleWindowClass":
-            results.append((hwnd, win32gui.GetWindowText(hwnd)))
+def load_map_image(node, img_path, name, colorspace="sRGB"):
+    node.image = bpy.data.images.load(img_path)
+    node.image.colorspace_settings.name = colorspace
+    node.image.name = name
+    
+def load_texture_maps(mat_dir, mat_name):
+    mat_dir = mat_dir / mat_name
+    mat_name = f"M_MF_{mat_name}"
+    material = bpy.data.materials.new(mat_name)
+    
+    # Set node tree editing
+    material.use_nodes = True
+    bpy.data.materials.new(mat_name)
+    nodes = material.node_tree.nodes
+    bsdf_node = nodes.get("Principled BSDF")
+    output_node = nodes.get("Material Output")
+    
+    basecolor_image_path = (mat_dir / "basecolor.png").as_posix()
+    normal_image_path = (mat_dir / "normal.png").as_posix()
+    roughness_image_path = (mat_dir / "roughness.png").as_posix()
+    height_image_path = (mat_dir / "height.png").as_posix()
+    metallic_image_path = (mat_dir / "metallic.png").as_posix()
+    
+    # Create a new image texture node for the texture maps
+    basecolor_map_node = create_node(nodes, "ShaderNodeTexImage", "DiffuseNode", location=(-200, 300), hide=True)
+    metallic_map_node = create_node(nodes, "ShaderNodeTexImage", "MetallicNode", location=(-200, 250), hide=True)
+    roughness_map_node = create_node(nodes, "ShaderNodeTexImage", "RoughnessNode", location=(-200, 200), hide=True)
+    normal_map_node = create_node(nodes, "ShaderNodeTexImage", "NormalNode", location=(-250, 100), hide=True)
+    normal_shader_node = create_node(nodes, 'ShaderNodeNormalMap', "NormalShaderNode", location=(-200, 150), hide=True)
+    height_map_node = create_node(nodes, "ShaderNodeTexImage", "HeightNode", location=(300, 100), hide=True)
+    displacement_shader_node = create_node(nodes, 'ShaderNodeDisplacement', "DisplacementNode", location=(350, 150), hide=True)
 
-    windows = []
-    win32gui.EnumWindows(enum_windows_callback, windows)
+    # Load the texture images 
+    load_map_image(basecolor_map_node, basecolor_image_path, name="Base Color", colorspace="sRGB")
+    load_map_image(height_map_node, height_image_path, name="Height", colorspace="Non-Color")
+    load_map_image(metallic_map_node, metallic_image_path, name="Metallic", colorspace="Non-Color")
+    load_map_image(roughness_map_node, roughness_image_path, name="Roughness", colorspace="Non-Color")
+    load_map_image(normal_map_node, normal_image_path, name="Normal", colorspace="Non-Color")
 
-    for hwnd, title in windows:
-        if title == "":
-            break
+    # Connect the texture nodes to the Principled BSDF inputs
+    material.node_tree.links.new(basecolor_map_node.outputs['Color'], bsdf_node.inputs['Base Color'])
+    material.node_tree.links.new(normal_map_node.outputs['Color'], normal_shader_node.inputs['Color'])
+    material.node_tree.links.new(normal_shader_node.outputs['Normal'], bsdf_node.inputs['Normal'])
+    material.node_tree.links.new(roughness_map_node.outputs['Color'], bsdf_node.inputs['Roughness'])
+    material.node_tree.links.new(height_map_node.outputs['Color'], displacement_shader_node.inputs['Height'])
+    material.node_tree.links.new(metallic_map_node.outputs['Color'], bsdf_node.inputs['Metallic'])
 
-    print(f"The Blender console window is {hwnd}")
-
-    # Check if the window is visible or hidden
-    is_visible = win32gui.IsWindowVisible(hwnd)
-
-    if is_visible:
-        print("The window is visible.")
-        win32gui.SetForegroundWindow(hwnd)
-    else:
-        print("The window is hidden.")
-        bpy.ops.wm.console_toggle()
+    # Connect the output of the height node to the Material Output displacement node's input
+    material.node_tree.links.new(displacement_shader_node.outputs['Displacement'], output_node.inputs['Displacement'])
+    
+    # Add created material to the active object
+    bpy.context.active_object.data.materials[0] = material

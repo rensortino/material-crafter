@@ -13,9 +13,12 @@ bl_info = {
 MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 16th 24"
 
-#TODO Add automatic texture loading
-
+# TODO Define boundaries for input values.
+# TODO Enable texture creation only when an object is selected.
+#TODO Fix register bug
+#TODO Refactor
 # TODO Make venv_path global
+# FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
 
 # Blender modules:
 import bpy
@@ -319,7 +322,7 @@ class CreateTextures(bpy.types.Operator):
         venv_path = env_path / "venv"
 
         user_input = {
-            "name": bpy.context.scene.input_tool.name,
+            "name": bpy.context.scene.input_tool.dir_name,
             "prompt": bpy.context.scene.input_tool.prompt,
             "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
             "model_path": model_id,
@@ -342,10 +345,10 @@ class CreateTextures(bpy.types.Operator):
         
         try:
             helpers.execution_handler(venv_path, "text2img", {**user_input, **sd_kwargs})
-            self.report({"INFO"}, f"Texture(s) Created!")
+            helpers.load_texture_maps(Path(user_input['save_path']), user_input['name'])
+            self.report({"INFO"}, f"New Material Created!")
         except subprocess.CalledProcessError as e:
-            self.report({"ERROR"}, "MatForger execution raised an exception:\n {e}")
-            self.report({"ERROR"}, e)
+            self.report({"ERROR"}, "Running text2img raised an exception:\n {e}")
             return {"ERROR"}
         return {"FINISHED"}
 
@@ -372,9 +375,6 @@ class MF_PT_Main(bpy.types.Panel):
 
         row = layout.row()
         row.label(text="*Input text for Stable Diffusion model.")
-
-        row = layout.row()
-        row.prop(input_tool, "format")
         
         row = layout.row()
         row.prop(input_tool, "fp16")
