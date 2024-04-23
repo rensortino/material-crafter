@@ -11,11 +11,12 @@ bl_info = {
 }
 
 MF_version = bl_info["version"]
-LAST_UPDATED = "Apr 16th 24"
+LAST_UPDATED = "Apr 22nd 2024"
 
 # TODO Enable texture creation only when an object is selected.
 #TODO Refactor
 # TODO Make venv_path global
+# TODO Make install dependencies button available only if licences are accepted
 # FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
 
 def set_dependencies_installed(are_installed):
@@ -87,7 +88,8 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         venv_path = environment_path / "venv"
         model_id = helpers.model_id
 
-        helpers.create_path_log(path=environment_path, path_name="environment_path")
+        helpers.create_named_paths(path=environment_path, path_name="environment_path")
+        helpers.create_named_paths(path=environment_path, path_name="environment_path")
 
         # Install pip:
         helpers.install_pip()
@@ -128,9 +130,6 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         self.report({"INFO"}, "Dependencies installed successfully")
 
         set_dependencies_installed(True)
-
-        # for cls in classes:
-        #     bpy.utils.register_class(cls)
 
         bpy.types.Scene.input_tool = bpy.props.PointerProperty(
             type=MF_PGT_Input_Properties
@@ -247,15 +246,6 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         name="Prompt", description="Text prompt to generate the texture"
     )
 
-    # format: bpy.props.EnumProperty(
-    #     name="Format",
-    #     description="Select texture file format",
-    #     items=[
-    #         (".png", ".png", "Export texture as .png"),
-    #         (".jpg", ".jpg", "Export texture as .jpg"),
-    #     ],
-    # )
-
     save_path: bpy.props.StringProperty(
         name="Save Path",
         description="Save path",
@@ -328,7 +318,7 @@ class CreateTextures(bpy.types.Operator):
 
     def execute(self, context):
         model_id = helpers.model_id
-        env_path = Path(helpers.read_path_log()['environment_path'])
+        env_path = Path(helpers.load_named_paths()['environment_path'])
         venv_path = env_path / "venv"
 
         user_input = {
@@ -384,7 +374,6 @@ class MF_PT_Main(bpy.types.Panel):
         row.prop(input_tool, "prompt")
 
         row = layout.row()
-        # row.label(text="*Input text for Stable Diffusion model.")
         
         row = layout.row()
         row.prop(input_tool, "fp16")
@@ -410,7 +399,6 @@ class MF_PT_Main(bpy.types.Panel):
         
         header, body = layout.panel("Diffusion Parameters", default_closed=False)
         
-        # header.bl_id_name = "Diffusion Parameters"
         row = header.row()
         row.label(text="Diffusion Parameters")
         
@@ -461,10 +449,6 @@ classes = (
 
 
 def register():
-    # TODO:
-    #  1. Detect if dependencies are already installed when restarting add-on
-    #  2. Detect if dependencies are installed when fresh installing add-on on different Blender version for example
-    #  Possible solution use environ variables: os.environ['variable_name'] = 'variable_value'
 
     global dependencies_installed
     dependencies_installed = False
@@ -476,12 +460,10 @@ def register():
         type=MF_PGT_Input_Properties_Pre
     )
 
-    if helpers.path_log_exists():
+    if helpers.named_paths_exists():
         set_dependencies_installed(True)
-        environment_path = Path(helpers.read_path_log()["environment_path"])
+        environment_path = Path(helpers.load_named_paths()["environment_path"])
         venv_path = environment_path / "venv"
-
-        # helpers.set_dependencies_installed(True)
 
         for cls in classes:
             bpy.utils.register_class(cls)
@@ -491,12 +473,8 @@ def register():
         )
 
         helpers.import_modules(venv_path)
-        # helpers.show_blender_system_console()
-        # for dependency in helpers.dependencies:
-        #     helpers.import_module(dependency.name)
         return
 
-    helpers.import_modules(venv_path)
     set_dependencies_installed(False)
     return
 
