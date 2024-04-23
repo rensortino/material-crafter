@@ -14,8 +14,6 @@ MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 22nd 2024"
 
 # TODO Add choice of cached model path.
-# TODO Enable texture creation only when an object is selected.
-# TODO Add Blender message logs.
 #TODO Refactor
 # TODO Make install dependencies button available only if licences are accepted
 # FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
@@ -102,12 +100,12 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         # Importing dependencies
         try:
+            pm.update_named_paths(environment_path, "environment_path")
+            pm.update_named_paths(venv_path, "venv_path")
             helpers.install_modules(venv_path=venv_path)
 
             self.report({"INFO"}, "Python modules installed successfully.")
             
-            pm.update_named_paths(environment_path, "environment_path")
-            pm.update_named_paths(venv_path, "venv_path")
             pm.save_named_paths()
             
         except (subprocess.CalledProcessError, ImportError) as err:
@@ -318,6 +316,16 @@ class CreateTextures(bpy.types.Operator):
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
+    
+    @classmethod
+    def poll(cls, context):
+        r'''
+        Allows material creation only if an element accepting materials is selected
+        '''
+        has_materials = hasattr(bpy.context.active_object.data, "materials")
+        if not has_materials:
+            cls.poll_message_set("Please select an object that supports materials")
+        return has_materials
 
     def execute(self, context):
         model_id = helpers.model_id
@@ -393,12 +401,10 @@ class MF_PT_Main(bpy.types.Panel):
         row.prop(input_tool, "dir_name")
 
         layout.separator()
-
+        
         layout.operator(
             "mf.create_textures", icon="DISCLOSURE_TRI_RIGHT", text="Create Textures"
         )
-
-        layout.separator()
         
         header, body = layout.panel("Diffusion Parameters", default_closed=False)
         
@@ -416,6 +422,7 @@ class MF_PT_Main(bpy.types.Panel):
 
         row = body.row()
         row.prop(input_tool, "num_steps")
+        
 
 
 class MF_PT_Help(bpy.types.Panel):
