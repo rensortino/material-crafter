@@ -13,9 +13,10 @@ bl_info = {
 MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 22nd 2024"
 
+# TODO Add choice of cached model path.
 # TODO Enable texture creation only when an object is selected.
+# TODO Add Blender message logs.
 #TODO Refactor
-# TODO Make venv_path global
 # TODO Make install dependencies button available only if licences are accepted
 # FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
 
@@ -48,6 +49,7 @@ if "bpy" in locals():
         if i in locals():
             importlib.reload(modules[i])
 
+pm = helpers.PathManager()
 
 # ======== Pre Dependency =================== #
 class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
@@ -57,13 +59,14 @@ class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
         description="The save path for the needed modules and the Stable Diffusion weights. If you have already "
         "installed MatForger, or you are using a different version of Blender, you can use your"
         " old Environment Path. Regardless of the method, always initiate your Environment.",
-        default=f"{helpers.current_drive}",
+        default=f"{pm.named_paths['environment_path'].parent if pm.paths_file_exists() else pm.default_path}",
         maxlen=1024,
         subtype="DIR_PATH",
     )
 
     agree_to_license: bpy.props.BoolProperty(
         name="I agree",
+        default=False,
         description="I agree to the MatForger License and the Hugging Face Stable Diffusion License.",
     )
 
@@ -85,11 +88,9 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         environment_path = (
             Path(bpy.context.scene.input_tool_pre.venv_path) / "MatForger-Add-on"
         )
+        
         venv_path = environment_path / "venv"
         model_id = helpers.model_id
-
-        helpers.create_named_paths(path=environment_path, path_name="environment_path")
-        helpers.create_named_paths(path=environment_path, path_name="environment_path")
 
         # Install pip:
         helpers.install_pip()
@@ -104,6 +105,11 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
             helpers.install_modules(venv_path=venv_path)
 
             self.report({"INFO"}, "Python modules installed successfully.")
+            
+            pm.update_named_paths(environment_path, "environment_path")
+            pm.update_named_paths(venv_path, "venv_path")
+            pm.save_named_paths()
+            
         except (subprocess.CalledProcessError, ImportError) as err:
             self.report({"ERROR"}, str(err))
             return {"CANCELLED"}
@@ -111,14 +117,11 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         helpers.import_modules(venv_path)
 
         try:
-            from diffusers import StableDiffusionPipeline, EulerDiscreteScheduler
+            from diffusers import StableDiffusionPipeline
             import torch
 
-            scheduler = EulerDiscreteScheduler.from_pretrained(
-                model_id, subfolder="scheduler"
-            )
             pipe = StableDiffusionPipeline.from_pretrained(
-                model_id, scheduler=scheduler, torch_dtype=torch.float16
+                model_id, torch_dtype=torch.float16, trust_remote_code=True
             )
             self.report({"INFO"}, "Stable Diffusion successfully installed.")
             pass
@@ -159,7 +162,7 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
             f"Please install the missing dependencies for the \"{bl_info.get('name')}\" add-on.",
             f"1. Open Edit > Preferences > Add-ons.",
             f"2. Search for the \"{bl_info.get('name')}\" add-on.",
-            f'4. Under "Preferences" click on the "{MFPRE_OT_install_dependencies.bl_label}"',
+            f'3. Under "Preferences" click on the "{MFPRE_OT_install_dependencies.bl_label}"',
             f"   button. This will download and install the missing Python packages,",
             f"   if Blender has the required permissions. If you are experiencing issues,",
             f"   re-open Blender with Administrator privileges.",
@@ -318,8 +321,7 @@ class CreateTextures(bpy.types.Operator):
 
     def execute(self, context):
         model_id = helpers.model_id
-        env_path = Path(helpers.load_named_paths()['environment_path'])
-        venv_path = env_path / "venv"
+        venv_path = pm.named_paths['venv_path']
 
         user_input = {
             "name": bpy.context.scene.input_tool.dir_name,
@@ -348,6 +350,7 @@ class CreateTextures(bpy.types.Operator):
             helpers.load_texture_maps(Path(user_input['save_path']), user_input['name'])
             self.report({"INFO"}, f"New Material Created!")
         except subprocess.CalledProcessError as e:
+            print(e)
             self.report({"ERROR"}, "Running text2img raised an exception:\n {e}")
             return {"ERROR"}
         return {"FINISHED"}
@@ -452,7 +455,7 @@ def register():
 
     global dependencies_installed
     dependencies_installed = False
-
+    
     for cls in pre_dependency_classes:
         bpy.utils.register_class(cls)
 
@@ -460,10 +463,11 @@ def register():
         type=MF_PGT_Input_Properties_Pre
     )
 
-    if helpers.named_paths_exists():
+    if pm.paths_file_exists():
+        pm.load_paths_file()        
         set_dependencies_installed(True)
-        environment_path = Path(helpers.load_named_paths()["environment_path"])
-        venv_path = environment_path / "venv"
+        environment_path = pm.named_paths["environment_path"]
+        venv_path = pm.named_paths["venv_path"]
 
         for cls in classes:
             bpy.utils.register_class(cls)

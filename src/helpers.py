@@ -1,29 +1,58 @@
-import pathlib
-import os
-import json
-import sys
-import subprocess
 import importlib
-import site
+import json
+import os
+import shutil
+import subprocess
+import sys
 from collections import namedtuple
 from pathlib import Path
+
 import bpy
 
 
+class PathManager(object):
+    """
+    Singleton class for path management
+    """
+
+    def __init__(self, paths_file_name: str = "paths.json"):
+        self.named_paths = {}
+        directory = Path(__file__).parent
+        self.paths_file = Path(directory.parent / paths_file_name)
+        self.load_paths_file()
+
+    def __new__(self):
+        if not hasattr(self, "_instance"):
+            self._instance = super(PathManager, self).__new__(self)
+        return self._instance
+
+    @property
+    def default_path(self):
+        return Path.home() / os.sep
+
+    def paths_file_exists(self) -> bool:
+        return self.paths_file.exists() and self.paths_file.is_file()
+
+    def load_paths_file(self):
+        if self.paths_file_exists():
+            loaded_paths = json.load(open(self.paths_file))
+            self.named_paths = {k: Path(v) for k, v in loaded_paths.items()}
+
+    def save_named_paths(self):
+        paths_as_strings = {k: v.as_posix() for k, v in self.named_paths.items()}
+        json_data = json.dumps(paths_as_strings, indent=1, ensure_ascii=True)
+
+        with open(self.paths_file, "w") as outfile:
+            outfile.write(json_data + "\n")
+
+    def update_named_paths(self, path: str, path_name=str):
+        self.named_paths[path_name] = path
+
+
+# TODO Take all static information from a json / yaml
 model_id = "gvecchio/MatForger"
 
-directory = Path(__file__).parent
-path_log = directory.parent / "path_log.json"
-
-
-def path_log_exists() -> bool:
-    return path_log.exists() and path_log.is_file()
-
-def read_path_log():
-    if path_log_exists():
-        return json.load(open(path_log))
-
-current_drive = Path(read_path_log()['environment_path']).parent if path_log_exists() else (Path.home() / os.sep)
+pm = PathManager()
 # Dependencies
 
 # Declare all modules that this add-on depends on, that may need to be installed. The package and (global) name can be
@@ -38,12 +67,16 @@ dependence_dict = {
     "accelerate": {"name": "accelerate", "extra_params": []},
     "torchvision": {"name": "torchvision", "extra_params": []},
     "xformers": {"name": "xformers", "extra_params": []},
-    "torch==2.2.2+cu121": {"name": "torch", "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"]},
+    "torch==2.2.2+cu121": {
+        "name": "torch",
+        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
+    },
 }
 
 Dependency = namedtuple("Dependency", ["module", "name", "extra_params"])
 dependencies = [
-    Dependency(module=i, name=j['name'], extra_params=j['extra_params']) for i, j in dependence_dict.items()
+    Dependency(module=i, name=j["name"], extra_params=j["extra_params"])
+    for i, j in dependence_dict.items()
 ]
 dependencies_installed = False
 
@@ -53,26 +86,14 @@ def set_dependencies_installed(are_installed):
     dependencies_installed = are_installed
 
 
-def create_path_log(path: str, path_name=str):
-    print(f"\n{path_log}\n")
-    json_data = json.dumps({path_name: path}, indent=1, ensure_ascii=True)
-
-    with open(path_log, "w") as outfile:
-        outfile.write(json_data + "\n")
-
-    return path_log
-
-
 # Returns true if dependency has been installed.
 def is_installed(dependency: str) -> bool:
     try:
         # Blender does not add the user's site-packages/ directory by default.
-        sys.path.append(site.getusersitepackages())
-        if "==" in dependency:
-            dependency = dependency.split("==")[0]
+        sys.path.append(pm.named_paths["venv_path"])
         return importlib.util.find_spec(dependency) is not None
     finally:
-        sys.path.remove(site.getusersitepackages())
+        sys.path.remove(pm.named_paths["venv_path"])
 
 
 def install_pip():
@@ -115,16 +136,16 @@ def install_modules(
        the global_name under which the module can be accessed.
     """
 
-    print(f"Installing dependencies: {''.join([i.module for i in dependencies])}")
+    print(f"Installing dependencies: {', '.join([i.module for i in dependencies])}")
 
     for dependency in dependencies:
         module_name = dependency.name
         extra_params = dependency.extra_params
-        make_global = False
+        # make_global = False
 
-        if "make_global" in extra_params:
-            extra_params.remove("make_global")
-            make_global = True
+        # if "make_global" in extra_params:
+        #     extra_params.remove("make_global")
+        #     make_global = True
 
         # Blender disables the loading of user site-packages by default. However, pip will still check them to determine
         # if a dependency is already installed. This can cause problems if the packages is installed in the user
@@ -150,20 +171,22 @@ def install_modules(
         if extra_params:
             install_commands_list.extend(extra_params)
 
-        if not make_global:
-            print(f"\nInstalling {module_name} to {venv_path}.\n")
-            if is_installed(module_name):
-                print(f"Module {module_name} already installed.")
-            else:
-                try:
-                    subprocess.run(install_commands_list, check=True, env=environ_copy)
-                except subprocess.CalledProcessError as e:
-                    print(
-                        f"Exception occurred while installing {dependency.module_name}: \n\n{e}"
-                    )
+        # if not make_global:
+        print(f"\nInstalling {module_name} to {venv_path}.\n")
+        if is_installed(module_name):
+            print(f"Module {module_name} already installed.")
+        else:
+            try:
+                subprocess.run(install_commands_list, check=True, env=environ_copy)
+            except subprocess.CalledProcessError as e:
+                print(
+                    f"Exception occurred while installing {dependency.module_name}: \n\n{e}"
+                )
 
 
-def execution_handler(venv_path: str, operation_function: str, user_input: dict, output: bool = True):
+def execution_handler(
+    venv_path: str, operation_function: str, user_input: dict, output: bool = True
+):
     """
     In order for the Venv to work inside Blender, we must run the script as the Venv is activated
     inside the actual 'activate.bat' file that Venv generates. This means that for each interaction with Stable Diffusion
@@ -174,23 +197,26 @@ def execution_handler(venv_path: str, operation_function: str, user_input: dict,
     appropriate input variables.
     """
 
-    activate_bat_path = venv_path / 'Scripts' / 'activate.bat'
-    python_exe_path = venv_path / 'Scripts' / 'python.exe'
+    activate_bat_path = venv_path / "Scripts" / "activate.bat"
+    python_exe_path = venv_path / "Scripts" / "python.exe"
     drive = activate_bat_path.drive
 
-    sd_interface_path = directory / "sd_functions.py"
-    
+    sd_interface_path = Path(__file__).parent / "sd_functions.py"
+
     # for dependency in dependencies[1:]:
     #     import_module(dependency.name)
 
     # Get args from user_input:
     args_string = " "
-    for arg_name, arg_value in user_input.items():  # user_input: {param_name: param_value}
+    for (
+        arg_name,
+        arg_value,
+    ) in user_input.items():  # user_input: {param_name: param_value}
         args_string += f"""--{arg_name} "{arg_value}" """
 
     commands = [
-            # f"""{drive}""",  # Triple quotes so we can include double quotes in commands.
-            f"""
+        # f"""{drive}""",  # Triple quotes so we can include double quotes in commands.
+        f"""
             "{python_exe_path}" "{sd_interface_path}" {operation_function}{args_string} 
             """,  # NOTE: "operation_function" is the name of the function in sd_interface.py given to the command line.
     ]
@@ -205,18 +231,18 @@ def execution_handler(venv_path: str, operation_function: str, user_input: dict,
                 bat_out.write(f"\n{line}")
 
     # Run activate.bat, activate Venv:
-    if output:
-        try:
-            output = subprocess.check_output(
-                    activate_bat_path.as_posix(),
-            )
-        except subprocess.CalledProcessError as e:
-            print(e.output)
-        return output
-    if not output:
-        subprocess.run(
-                activate_bat_path,
+    # if output:
+    try:
+        output = subprocess.check_output(
+            activate_bat_path.as_posix(),
         )
+    except subprocess.CalledProcessError as e:
+        raise e
+    #     return output
+    # if not output:
+    #     subprocess.run(
+    #         activate_bat_path,
+    #     )
 
 
 def import_modules(venv_path: str):
@@ -224,6 +250,7 @@ def import_modules(venv_path: str):
     sys.path.insert(
         0, site_packages_path.as_posix()
     )  # HACK Ugly but working way to import installed packages
+
 
 def import_module(module_name):
     """
@@ -238,9 +265,9 @@ def import_module(module_name):
         # Attempt to import the module and assign it to globals dictionary. This allows to access the module
         # under the given name, just like the regular import would.
         globals()[module_name] = importlib.import_module(module_name)
-        
 
-def create_node(nodes, type, name, location=(0,0), hide=True, width=150):
+
+def create_node(nodes, type, name, location=(0, 0), hide=True, width=150):
     new_node = nodes.new(type)
     new_node.name = name
     new_node.location = location
@@ -248,55 +275,122 @@ def create_node(nodes, type, name, location=(0,0), hide=True, width=150):
     new_node.width = width
     return new_node
 
+
 def load_map_image(node, img_path, name, colorspace="sRGB"):
     node.image = bpy.data.images.load(img_path)
     node.image.colorspace_settings.name = colorspace
     node.image.name = name
-    
+
+
 def load_texture_maps(mat_dir, mat_name):
     mat_dir = mat_dir / mat_name
     mat_name = f"M_MF_{mat_name}"
     material = bpy.data.materials.new(mat_name)
-    
+
     # Set node tree editing
     material.use_nodes = True
     bpy.data.materials.new(mat_name)
     nodes = material.node_tree.nodes
     bsdf_node = nodes.get("Principled BSDF")
     output_node = nodes.get("Material Output")
-    
+
     basecolor_image_path = (mat_dir / "basecolor.png").as_posix()
     normal_image_path = (mat_dir / "normal.png").as_posix()
     roughness_image_path = (mat_dir / "roughness.png").as_posix()
     height_image_path = (mat_dir / "height.png").as_posix()
     metallic_image_path = (mat_dir / "metallic.png").as_posix()
-    
-    # Create a new image texture node for the texture maps
-    basecolor_map_node = create_node(nodes, "ShaderNodeTexImage", "DiffuseNode", location=(-200, 300), hide=True)
-    metallic_map_node = create_node(nodes, "ShaderNodeTexImage", "MetallicNode", location=(-200, 250), hide=True)
-    roughness_map_node = create_node(nodes, "ShaderNodeTexImage", "RoughnessNode", location=(-200, 200), hide=True)
-    normal_map_node = create_node(nodes, "ShaderNodeTexImage", "NormalNode", location=(-250, 100), hide=True)
-    normal_shader_node = create_node(nodes, 'ShaderNodeNormalMap', "NormalShaderNode", location=(-200, 150), hide=True)
-    height_map_node = create_node(nodes, "ShaderNodeTexImage", "HeightNode", location=(300, 100), hide=True)
-    displacement_shader_node = create_node(nodes, 'ShaderNodeDisplacement', "DisplacementNode", location=(350, 150), hide=True)
 
-    # Load the texture images 
-    load_map_image(basecolor_map_node, basecolor_image_path, name="Base Color", colorspace="sRGB")
-    load_map_image(height_map_node, height_image_path, name="Height", colorspace="Non-Color")
-    load_map_image(metallic_map_node, metallic_image_path, name="Metallic", colorspace="Non-Color")
-    load_map_image(roughness_map_node, roughness_image_path, name="Roughness", colorspace="Non-Color")
-    load_map_image(normal_map_node, normal_image_path, name="Normal", colorspace="Non-Color")
+    # Create a new image texture node for the texture maps
+    basecolor_map_node = create_node(
+        nodes, "ShaderNodeTexImage", "DiffuseNode", location=(-200, 300), hide=True
+    )
+    metallic_map_node = create_node(
+        nodes, "ShaderNodeTexImage", "MetallicNode", location=(-200, 250), hide=True
+    )
+    roughness_map_node = create_node(
+        nodes, "ShaderNodeTexImage", "RoughnessNode", location=(-200, 200), hide=True
+    )
+    normal_map_node = create_node(
+        nodes, "ShaderNodeTexImage", "NormalNode", location=(-250, 100), hide=True
+    )
+    normal_shader_node = create_node(
+        nodes,
+        "ShaderNodeNormalMap",
+        "NormalShaderNode",
+        location=(-200, 150),
+        hide=True,
+    )
+    height_map_node = create_node(
+        nodes, "ShaderNodeTexImage", "HeightNode", location=(300, 100), hide=True
+    )
+    displacement_shader_node = create_node(
+        nodes,
+        "ShaderNodeDisplacement",
+        "DisplacementNode",
+        location=(350, 150),
+        hide=True,
+    )
+
+    # Load the texture images
+    load_map_image(
+        basecolor_map_node, basecolor_image_path, name="Base Color", colorspace="sRGB"
+    )
+    load_map_image(
+        height_map_node, height_image_path, name="Height", colorspace="Non-Color"
+    )
+    load_map_image(
+        metallic_map_node, metallic_image_path, name="Metallic", colorspace="Non-Color"
+    )
+    load_map_image(
+        roughness_map_node,
+        roughness_image_path,
+        name="Roughness",
+        colorspace="Non-Color",
+    )
+    load_map_image(
+        normal_map_node, normal_image_path, name="Normal", colorspace="Non-Color"
+    )
 
     # Connect the texture nodes to the Principled BSDF inputs
-    material.node_tree.links.new(basecolor_map_node.outputs['Color'], bsdf_node.inputs['Base Color'])
-    material.node_tree.links.new(normal_map_node.outputs['Color'], normal_shader_node.inputs['Color'])
-    material.node_tree.links.new(normal_shader_node.outputs['Normal'], bsdf_node.inputs['Normal'])
-    material.node_tree.links.new(roughness_map_node.outputs['Color'], bsdf_node.inputs['Roughness'])
-    material.node_tree.links.new(height_map_node.outputs['Color'], displacement_shader_node.inputs['Height'])
-    material.node_tree.links.new(metallic_map_node.outputs['Color'], bsdf_node.inputs['Metallic'])
+    material.node_tree.links.new(
+        basecolor_map_node.outputs["Color"], bsdf_node.inputs["Base Color"]
+    )
+    material.node_tree.links.new(
+        normal_map_node.outputs["Color"], normal_shader_node.inputs["Color"]
+    )
+    material.node_tree.links.new(
+        normal_shader_node.outputs["Normal"], bsdf_node.inputs["Normal"]
+    )
+    material.node_tree.links.new(
+        roughness_map_node.outputs["Color"], bsdf_node.inputs["Roughness"]
+    )
+    material.node_tree.links.new(
+        height_map_node.outputs["Color"], displacement_shader_node.inputs["Height"]
+    )
+    material.node_tree.links.new(
+        metallic_map_node.outputs["Color"], bsdf_node.inputs["Metallic"]
+    )
 
     # Connect the output of the height node to the Material Output displacement node's input
-    material.node_tree.links.new(displacement_shader_node.outputs['Displacement'], output_node.inputs['Displacement'])
-    
+    material.node_tree.links.new(
+        displacement_shader_node.outputs["Displacement"],
+        output_node.inputs["Displacement"],
+    )
+
     # Add created material to the active object
     bpy.context.active_object.data.materials[0] = material
+
+
+def check_drive_space(path: str = os.getcwd()):
+    """
+    Checks current drive if it has enough available space to store the Environment and Stable Diffusion weights.
+    """
+    total, used, free = shutil.disk_usage(path)
+    required_space = 15 * 2**30
+    free_after = free - required_space
+
+    if free_after < 0:
+        return False
+    elif free_after > 5 * 2**30:
+        print("WARNING: Less than 5GB will be left after completing installation")
+    return True
