@@ -88,12 +88,13 @@ def set_dependencies_installed(are_installed):
 
 # Returns true if dependency has been installed.
 def is_installed(dependency: str) -> bool:
+    site_packages_path = pm.named_paths["venv_path"] / "lib" / "site-packages" 
     try:
         # Blender does not add the user's site-packages/ directory by default.
-        sys.path.append(pm.named_paths["venv_path"])
+        sys.path.append(site_packages_path)
         return importlib.util.find_spec(dependency) is not None
     finally:
-        sys.path.remove(pm.named_paths["venv_path"])
+        sys.path.remove(site_packages_path)
 
 
 def install_pip():

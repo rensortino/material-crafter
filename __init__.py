@@ -79,6 +79,12 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         "elevated permissions in order to install the package."
     )
     bl_options = {"REGISTER", "INTERNAL"}
+    
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.scene.input_tool_pre.agree_to_license:
+            cls.poll_message_set("Please accept the license before installing")
+        return bpy.context.scene.input_tool_pre.agree_to_license
 
     def execute(self, context):
         # TODO: make asynchronous so that download progress is viewable from UI.
@@ -131,6 +137,10 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         self.report({"INFO"}, "Dependencies installed successfully")
 
         set_dependencies_installed(True)
+        
+        for mf_cls in classes: #TODO replace with function that takes class list and registers classes if not already done
+            if not mf_cls.is_registered:
+                bpy.utils.register_class(mf_cls)
 
         bpy.types.Scene.input_tool = bpy.props.PointerProperty(
             type=MF_PGT_Input_Properties
@@ -215,11 +225,11 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
             MFPRE_OT_install_dependencies.bl_idname, icon="CONSOLE"
         )
 
-        if not bpy.context.scene.input_tool_pre.agree_to_license:
-            # row_install_dependencies_button.enabled = False
-            row_install_dependencies_button.enabled = True
-        else:
-            row_install_dependencies_button.enabled = True
+        # if not bpy.context.scene.input_tool_pre.agree_to_license:
+        #     row_install_dependencies_button.enabled = False
+        #     # row_install_dependencies_button.enabled = True
+        # else:
+        #     row_install_dependencies_button.enabled = True
 
         if dependencies_installed and bpy.context.scene.input_tool_pre.agree_to_license:
             row_agree_to_license.enabled = False
@@ -360,7 +370,7 @@ class CreateTextures(bpy.types.Operator):
         except subprocess.CalledProcessError as e:
             print(e)
             self.report({"ERROR"}, "Running text2img raised an exception:\n {e}")
-            return {"ERROR"}
+            return {"CANCELLED"}
         return {"FINISHED"}
 
 

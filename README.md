@@ -22,13 +22,14 @@ A Blender add-on for running the MatForger model in Blender
 
 5. Accept the licenses and run the installation of the dependencies. This will create a python virtual environment (venv) in the specified path and install a set of predefined libraries.
 
-
     **IMPORTANT**: this will take some time and Blender will hang until the installation has finished. Follow step 2 to open the output console and monitor the installation progress.
 
 6. Now, you will find MatForger on the right side of the panel, clicking on the arrow.
 7. Specify your prompt and generation parameters and click on `Create Textures`. 
+    
     **NOTE**: before generating texture maps, you need to select an object you want to apply it to.
 8. Now you material should be applied to your selected object. If you want to see your texture maps, they are also saved in a local folder, specified in the input field.
+   
    **NOTE**: To visualize the material applied to the mesh, remember to set the `Viewport Shading` to `Material Preview` or `Rendered `
 
 
