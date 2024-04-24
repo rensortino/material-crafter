@@ -13,9 +13,7 @@ bl_info = {
 MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 22nd 2024"
 
-# TODO Add choice of cached model path.
 #TODO Refactor
-# TODO Make install dependencies button available only if licences are accepted
 # FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
 
 def set_dependencies_installed(are_installed):
@@ -28,6 +26,7 @@ import bpy
 # Python modules:
 from pathlib import Path
 import sys
+import os
 import tempfile
 import importlib
 import subprocess
@@ -36,6 +35,7 @@ import subprocess
 sys.path.append(Path(__file__).parent)
 
 from .src import helpers
+from .src.textures import load_texture_maps
 
 # Refresh Locals for development:
 if "bpy" in locals():
@@ -52,12 +52,19 @@ pm = helpers.PathManager()
 # ======== Pre Dependency =================== #
 class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
     # Install Dependencies panel:
-    venv_path: bpy.props.StringProperty(
-        name="Environment Path",
-        description="The save path for the needed modules and the Stable Diffusion weights. If you have already "
+    mf_path: bpy.props.StringProperty(
+        name="MatForger Path",
+        description="The save path for the virtual environments. If you have already "
         "installed MatForger, or you are using a different version of Blender, you can use your"
         " old Environment Path. Regardless of the method, always initiate your Environment.",
-        default=f"{pm.named_paths['environment_path'].parent if pm.paths_file_exists() else pm.default_path}",
+        default=f"{pm.named_paths['matforger']}",
+        maxlen=1024,
+        subtype="DIR_PATH",
+    )
+    hf_path: bpy.props.StringProperty(
+        name="HF Model Path",
+        description="Where to save MatForger weights.",
+        default=f"{pm.named_paths['model']}",
         maxlen=1024,
         subtype="DIR_PATH",
     )
@@ -87,14 +94,15 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         return bpy.context.scene.input_tool_pre.agree_to_license
 
     def execute(self, context):
-        # TODO: make asynchronous so that download progress is viewable from UI.
-        # Paths:
-        environment_path = (
-            Path(bpy.context.scene.input_tool_pre.venv_path) / "MatForger-Add-on"
+
+        matforger_path = (
+            Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
         )
         
-        venv_path = environment_path / "venv"
+        venv_path = matforger_path / "venv"
         model_id = helpers.model_id
+        hf_path = bpy.context.scene.input_tool_pre.hf_path
+        os.environ['HF_HOME'] = hf_path
 
         # Install pip:
         helpers.install_pip()
@@ -106,8 +114,9 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         # Importing dependencies
         try:
-            pm.update_named_paths(environment_path, "environment_path")
-            pm.update_named_paths(venv_path, "venv_path")
+            pm.update_named_paths(matforger_path, "matforger")
+            pm.update_named_paths(venv_path, "venv")
+            pm.update_named_paths(Path(hf_path), "model")
             helpers.install_modules(venv_path=venv_path)
 
             self.report({"INFO"}, "Python modules installed successfully.")
@@ -124,7 +133,8 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
             from diffusers import StableDiffusionPipeline
             import torch
 
-            pipe = StableDiffusionPipeline.from_pretrained(
+            self.report({"INFO"}, "Retrieving model from local cache or hub")
+            StableDiffusionPipeline.from_pretrained(
                 model_id, torch_dtype=torch.float16, trust_remote_code=True
             )
             self.report({"INFO"}, "Stable Diffusion successfully installed.")
@@ -158,10 +168,10 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        environment_path = (
+        matforger_path = (
             Path(bpy.context.scene.input_tool_pre.venv_path) / "MatForger-Add-on"
         )
-        return not environment_path.exists()
+        return not matforger_path.exists()
 
     def draw(self, context):
         layout = self.layout
@@ -189,7 +199,10 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
         input_tool_pre = scene.input_tool_pre
 
         row = layout.row()
-        row.prop(input_tool_pre, "venv_path")
+        row.prop(input_tool_pre, "mf_path")
+
+        row = layout.row()
+        row.prop(input_tool_pre, "hf_path")
 
         # Hugging Face and MatForger License agreement:
 
@@ -224,12 +237,6 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
         row_install_dependencies_button.operator(
             MFPRE_OT_install_dependencies.bl_idname, icon="CONSOLE"
         )
-
-        # if not bpy.context.scene.input_tool_pre.agree_to_license:
-        #     row_install_dependencies_button.enabled = False
-        #     # row_install_dependencies_button.enabled = True
-        # else:
-        #     row_install_dependencies_button.enabled = True
 
         if dependencies_installed and bpy.context.scene.input_tool_pre.agree_to_license:
             row_agree_to_license.enabled = False
@@ -339,7 +346,7 @@ class CreateTextures(bpy.types.Operator):
 
     def execute(self, context):
         model_id = helpers.model_id
-        venv_path = pm.named_paths['venv_path']
+        venv_path = pm.named_paths['venv']
 
         user_input = {
             "name": bpy.context.scene.input_tool.dir_name,
@@ -365,7 +372,7 @@ class CreateTextures(bpy.types.Operator):
         
         try:
             helpers.execution_handler(venv_path, "text2img", {**user_input, **sd_kwargs})
-            helpers.load_texture_maps(Path(user_input['save_path']), user_input['name'])
+            load_texture_maps(Path(user_input['save_path']), user_input['name'])
             self.report({"INFO"}, f"New Material Created!")
         except subprocess.CalledProcessError as e:
             print(e)
@@ -483,8 +490,7 @@ def register():
     if pm.paths_file_exists():
         pm.load_paths_file()        
         set_dependencies_installed(True)
-        environment_path = pm.named_paths["environment_path"]
-        venv_path = pm.named_paths["venv_path"]
+        venv_path = pm.named_paths["venv"]
 
         for cls in classes:
             bpy.utils.register_class(cls)
