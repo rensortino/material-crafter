@@ -13,6 +13,7 @@ bl_info = {
 MF_version = bl_info["version"]
 LAST_UPDATED = "Apr 22nd 2024"
 
+# TODO Add choice of cached model path.
 #TODO Refactor
 # FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
 
@@ -169,7 +170,7 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         matforger_path = (
-            Path(bpy.context.scene.input_tool_pre.venv_path) / "MatForger-Add-on"
+            Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
         )
         return not matforger_path.exists()
 
@@ -231,7 +232,7 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
         row_agree_to_license.alignment = "CENTER"
         row_agree_to_license.prop(input_tool_pre, "agree_to_license")
 
-        layout.separator()
+        # layout.separator()
 
         row_install_dependencies_button = layout.row()
         row_install_dependencies_button.operator(
@@ -240,6 +241,10 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
 
         if dependencies_installed and bpy.context.scene.input_tool_pre.agree_to_license:
             row_agree_to_license.enabled = False
+            row_dependencies_installed = layout.row()
+            row_dependencies_installed.alignment = "CENTER"
+            row_dependencies_installed.label(text="Dependencies already installed", icon="ERROR")
+            
 
 
 pre_dependency_classes = (
