@@ -491,11 +491,17 @@ def register():
     bpy.types.Scene.input_tool_pre = bpy.props.PointerProperty(
         type=MF_PGT_Input_Properties_Pre
     )
+    
+    
+    if not helpers.dependencies_installed():
+        set_dependencies_installed(False)
+        return
 
     if pm.paths_file_exists():
         pm.load_paths_file()        
         set_dependencies_installed(True)
         venv_path = pm.named_paths["venv"]
+        
 
         for cls in classes:
             bpy.utils.register_class(cls)
@@ -506,9 +512,6 @@ def register():
 
         helpers.import_modules(venv_path)
         return
-
-    set_dependencies_installed(False)
-    return
 
 
 def unregister():

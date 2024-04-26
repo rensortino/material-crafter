@@ -89,16 +89,31 @@ def set_dependencies_installed(are_installed):
     global dependencies_installed
     dependencies_installed = are_installed
 
+def dependencies_installed() -> bool:
+    try:
+        for dependency in dependencies:
+            import_module(dependency.module)
+        return True
+    except ImportError:
+        # Don't register other panels, operators etc.
+        return False
+    
+def is_installed(dependency):
+    try:
+        import_module(dependency)
+        return True
+    except ImportError:
+        return False
 
 # Returns true if dependency has been installed.
-def is_installed(dependency: str) -> bool:
-    site_packages_path = pm.named_paths["venv"] / "lib" / "site-packages" 
-    try:
-        # Blender does not add the user's site-packages/ directory by default.
-        sys.path.append(site_packages_path)
-        return importlib.util.find_spec(dependency) is not None
-    finally:
-        sys.path.remove(site_packages_path)
+# def is_installed(dependency: str) -> bool:
+#     site_packages_path = pm.named_paths["venv"] / "lib" / "site-packages" 
+#     try:
+#         # Blender does not add the user's site-packages/ directory by default.
+#         sys.path.append(site_packages_path)
+#         return importlib.util.find_spec(dependency) is not None
+#     finally:
+#         sys.path.remove(site_packages_path)
 
 
 def install_pip():
@@ -251,10 +266,13 @@ def execution_handler(
 
 
 def import_modules(venv_path: str):
-    site_packages_path = venv_path / "Lib" / "site-packages"
-    sys.path.insert(
-        0, site_packages_path.as_posix()
-    )  # HACK Ugly but working way to import installed packages
+    for dependency in dependencies:
+        module_name = dependency.name
+        import_module(module_name)
+    # site_packages_path = venv_path / "Lib" / "site-packages"
+    # sys.path.insert(
+    #     0, site_packages_path.as_posix()
+    # )  # HACK Ugly but working way to import installed packages
 
 
 def import_module(module_name):
