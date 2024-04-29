@@ -58,7 +58,7 @@ class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
         description="The save path for the virtual environments. If you have already "
         "installed MatForger, or you are using a different version of Blender, you can use your"
         " old Environment Path. Regardless of the method, always initiate your Environment.",
-        default=f"{pm.named_paths['matforger']}",
+        default=f"{pm.named_paths['matforger'].parent}",
         maxlen=1024,
         subtype="DIR_PATH",
     )

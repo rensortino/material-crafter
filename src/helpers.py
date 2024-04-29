@@ -24,6 +24,7 @@ class PathManager(object):
         directory = Path(__file__).parent
         self.paths_file = Path(directory.parent / paths_file_name)
         self.load_paths_file()
+        self.named_paths["site-packages"] = self.named_paths['venv'] / "Lib" / "site-packages"
 
     def __new__(self):
         if not hasattr(self, "_instance"):
@@ -41,6 +42,10 @@ class PathManager(object):
         if self.paths_file_exists():
             loaded_paths = json.load(open(self.paths_file))
             self.named_paths = {k: Path(v) for k, v in loaded_paths.items()}
+    
+    def add_venv_path_visibility(self):
+        if not (self.named_paths['site-packages']).as_posix() in sys.path:
+            sys.path.insert(0, self.named_paths['site-packages'].as_posix())
 
     def save_named_paths(self):
         paths_as_strings = {k: v.as_posix() for k, v in self.named_paths.items()}
@@ -99,6 +104,8 @@ def dependencies_installed() -> bool:
         return False
     
 def is_installed(dependency):
+    # if importlib.util.find_spec(dependency):
+    #     return True
     try:
         import_module(dependency)
         return True
@@ -193,15 +200,15 @@ def install_modules(
 
         # if not make_global:
         print(f"\nInstalling {module_name} to {venv_path}.\n")
-        if is_installed(module_name):
-            print(f"Module {module_name} already installed.")
-        else:
-            try:
-                subprocess.run(install_commands_list, check=True, env=environ_copy)
-            except subprocess.CalledProcessError as e:
-                print(
-                    f"Exception occurred while installing {dependency.module_name}: \n\n{e}"
-                )
+        # if is_installed(module_name):
+        #     print(f"Module {module_name} already installed.")
+        # else:
+        try:
+            subprocess.run(install_commands_list, check=True, env=environ_copy)
+        except subprocess.CalledProcessError as e:
+            print(
+                f"Exception occurred while installing {dependency.module_name}: \n\n{e}"
+            )
 
 
 def execution_handler(
@@ -218,6 +225,7 @@ def execution_handler(
     """
 
     activate_bat_path = venv_path / "Scripts" / "activate.bat"
+    activate_and_run_path = venv_path / "Scripts" / "activate_and_run.bat"
     python_exe_path = venv_path / "Scripts" / "python.exe"
     drive = activate_bat_path.drive
 
@@ -243,7 +251,7 @@ def execution_handler(
 
     # Send commands to activate.bat
     with open(activate_bat_path, "rt") as bat_in:
-        with open(activate_bat_path, "wt") as bat_out:
+        with open(activate_and_run_path, "wt") as bat_out:
             for line in bat_in:
                 bat_out.write(line)
 
@@ -254,7 +262,7 @@ def execution_handler(
     # if output:
     try:
         output = subprocess.check_output(
-            activate_bat_path.as_posix(),
+            activate_and_run_path.as_posix(),
         )
     except subprocess.CalledProcessError as e:
         raise e
@@ -281,20 +289,21 @@ def import_module(module_name):
     :param module_name: Module to import.
     :raises: ImportError and ModuleNotFoundError
     """
-
-    if module_name in globals():
-        importlib.reload(globals()[module_name])
-    else:
+    
+    pm.add_venv_path_visibility()
+    # if module_name in globals():
+        # importlib.reload(globals()[module_name])
+    # else:
         # Attempt to import the module and assign it to globals dictionary. This allows to access the module
         # under the given name, just like the regular import would.
-        globals()[module_name] = importlib.import_module(module_name)
+    globals()[module_name] = importlib.import_module(module_name)
 
 def check_drive_space(path: str = os.getcwd()):
     """
     Checks current drive if it has enough available space to store the Environment and Stable Diffusion weights.
     """
     total, used, free = shutil.disk_usage(path)
-    required_space = 15 * 2**30
+    required_space = 15 * 2**30 # Convert to GB
     free_after = free - required_space
 
     if free_after < 0:
