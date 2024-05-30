@@ -20,7 +20,7 @@ class PathManager(object):
             "matforger": self.default_path,
             "model": Path.home() / ".cache/huggingface"
         }
-        self.named_paths["venv"] = self.named_paths['matforger'] / "venv",
+        self.named_paths["venv"] = self.named_paths['matforger'] / "venv"
         directory = Path(__file__).parent
         self.paths_file = Path(directory.parent / paths_file_name)
         self.load_paths_file()
@@ -68,25 +68,25 @@ pm = PathManager()
 # set to None, if they are equal to the module name. See import_module and ensure_and_import_module for the explanation
 # of the arguments. DO NOT use this to import other parts of this Python add-on, see "Local modules" above for examples.
 
-dependence_dict = {
-    "fire": {"name": "fire", "extra_params": []},
-    "numpy": {"name": "numpy", "extra_params": []},
-    "diffusers": {"name": "diffusers", "extra_params": []},
-    "transformers": {"name": "transformers", "extra_params": []},
-    "accelerate": {"name": "accelerate", "extra_params": []},
-    "torchvision": {"name": "torchvision", "extra_params": []},
-    "xformers": {"name": "xformers", "extra_params": []},
-    "torch==2.2.2+cu121": {
-        "name": "torch",
+dependencies = {
+    "numpy": {"extra_params": []},
+    "torch": {
+        "version": "2.2.2",
         "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
     },
+    "torchvision": {
+        "version": "0.17.2",
+        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
+    },
+    "xformers": {
+        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
+        },
+    "fire": {"extra_params": []},
+    "diffusers": {"extra_params": []},
+    "transformers": {"extra_params": []},
+    "accelerate": {"extra_params": []},
 }
 
-Dependency = namedtuple("Dependency", ["module", "name", "extra_params"])
-dependencies = [
-    Dependency(module=i, name=j["name"], extra_params=j["extra_params"])
-    for i, j in dependence_dict.items()
-]
 dependencies_installed = False
 
 
@@ -97,7 +97,7 @@ def set_dependencies_installed(are_installed):
 def dependencies_installed() -> bool:
     try:
         for dependency in dependencies:
-            import_module(dependency.module)
+            import_module(dependency)
         return True
     except ImportError:
         # Don't register other panels, operators etc.
@@ -163,11 +163,12 @@ def install_modules(
        the global_name under which the module can be accessed.
     """
 
-    print(f"Installing dependencies: {', '.join([i.module for i in dependencies])}")
+    print(f"Installing dependencies: {', '.join([i for i in dependencies])}")
 
-    for dependency in dependencies:
-        module_name = dependency.name
-        extra_params = dependency.extra_params
+    for module_name, module_params in dependencies.items():
+        if "version" in module_params:
+            module_name += f"=={module_params['version']}"
+        extra_params = module_params['extra_params']
         # make_global = False
 
         # if "make_global" in extra_params:
@@ -198,16 +199,12 @@ def install_modules(
         if extra_params:
             install_commands_list.extend(extra_params)
 
-        # if not make_global:
         print(f"\nInstalling {module_name} to {venv_path}.\n")
-        # if is_installed(module_name):
-        #     print(f"Module {module_name} already installed.")
-        # else:
         try:
             subprocess.run(install_commands_list, check=True, env=environ_copy)
         except subprocess.CalledProcessError as e:
             print(
-                f"Exception occurred while installing {dependency.module_name}: \n\n{e}"
+                f"Exception occurred while installing {module_name}: \n\n{e}"
             )
 
 
