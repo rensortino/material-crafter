@@ -271,8 +271,7 @@ def execution_handler(
 
 
 def import_modules(venv_path: str):
-    for dependency in dependencies:
-        module_name = dependency.name
+    for module_name in dependencies:
         import_module(module_name)
     # site_packages_path = venv_path / "Lib" / "site-packages"
     # sys.path.insert(
