@@ -11,19 +11,27 @@ class SDInterfaceCommands(object):
                 prompt: str,
                 save_path: Path,
                 model_path: str,
-                fp16: bool,
+                precision: str,
                 device: str,
                 **kwargs
                 ):
         # img = Image.open(img_path)
         save_dir = Path(save_path) / name
         save_dir.mkdir(exist_ok=True, parents=True)
+
+        if precision == "fp32":
+            torch_dtype = torch.float32
+        elif precision == "fp16":
+            torch_dtype = torch.float16
+        else:
+            raise ValueError(f"Unrecognized precision value {precision}")
+
         pipe = DiffusionPipeline.from_pretrained(
             model_path,
             trust_remote_code=True,
             low_cpu_mem_usage=False, 
             device_map=None,
-            torch_dtype=torch.float16 if fp16 else torch.float32,
+            torch_dtype=torch_dtype,
         )
         
         # Enable memory optimization

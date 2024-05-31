@@ -79,6 +79,11 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
     )
     bl_options = {"REGISTER", "INTERNAL"}
     
+    def invoke(self, context, event):
+        if dependencies_installed:
+            msg = "Dependencies are already installed. Are you sure you want to reinstall all packages?"
+        return context.window_manager.invoke_confirm(self, event, message=msg)
+    
     @classmethod
     def poll(cls, context):
         if not bpy.context.scene.input_tool_pre.agree_to_license:
@@ -277,10 +282,14 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         ],
     )
 
-    fp16: bpy.props.BoolProperty(
-        name="Half Precision (FP16)",
-        default=True,
-        description="Choose whether to run the model with half precision to use less memory.",
+    precision: bpy.props.EnumProperty(
+        name="Precision",
+        description="Floating Point Precision. This affects memory usage",
+        default="fp16",
+        items=[
+            ("fp32", "FP32 (Full)", "Full Precision"),
+            ("fp16", "FP16 (Half)", "Half Precision"),
+        ],
     )
 
     guidance_scale: bpy.props.FloatProperty(
@@ -348,7 +357,7 @@ class CreateTextures(bpy.types.Operator):
             "prompt": bpy.context.scene.input_tool.prompt,
             "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
             "model_path": bpy.context.scene.input_tool.prompt,
-            "fp16": bpy.context.scene.input_tool.fp16,
+            "precision": bpy.context.scene.input_tool.precision,
             "device": bpy.context.scene.input_tool.device,
         }
         
@@ -402,7 +411,7 @@ class MF_PT_Main(bpy.types.Panel):
         row.prop(input_tool, "model_id")
         
         row = layout.row()
-        row.prop(input_tool, "fp16")
+        row.prop(input_tool, "precision")
 
         row = layout.row()
         row.prop(input_tool, "device")
