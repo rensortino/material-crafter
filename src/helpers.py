@@ -4,10 +4,7 @@ import os
 import shutil
 import subprocess
 import sys
-from collections import namedtuple
 from pathlib import Path
-
-import bpy
 
 
 class PathManager(object):
@@ -18,7 +15,8 @@ class PathManager(object):
     def __init__(self, paths_file_name: str = "paths.json"):
         self.named_paths = {
             "matforger": self.default_path,
-            "model": Path.home() / ".cache/huggingface"
+            "model": Path.home() / ".cache/huggingface",
+            "texture_output": Path.home() / ".tmp"
         }
         self.named_paths["venv"] = self.named_paths['matforger'] / "venv"
         directory = Path(__file__).parent
@@ -54,12 +52,8 @@ class PathManager(object):
         with open(self.paths_file, "w") as outfile:
             outfile.write(json_data + "\n")
 
-    def update_named_paths(self, path: str, path_name=str):
-        self.named_paths[path_name] = path
-
-
-# TODO Take all static information from a json / yaml
-model_id = "gvecchio/MatForger"
+    def update_named_paths(self, path, path_name = str):
+        self.named_paths[path_name] = Path(path)
 
 pm = PathManager()
 # Dependencies
@@ -113,17 +107,6 @@ def is_installed(dependency):
     except ImportError:
         return False
 
-# Returns true if dependency has been installed.
-# def is_installed(dependency: str) -> bool:
-#     site_packages_path = pm.named_paths["venv"] / "lib" / "site-packages" 
-#     try:
-#         # Blender does not add the user's site-packages/ directory by default.
-#         sys.path.append(site_packages_path)
-#         return importlib.util.find_spec(dependency) is not None
-#     finally:
-#         sys.path.remove(site_packages_path)
-
-
 def install_pip():
     """
     Installs pip if not already present. Please note that ensurepip.bootstrap() also calls pip, which adds the
@@ -170,11 +153,6 @@ def install_modules(
         if "version" in module_params:
             module_name += f"=={module_params['version']}"
         extra_params = module_params['extra_params']
-        # make_global = False
-
-        # if "make_global" in extra_params:
-        #     extra_params.remove("make_global")
-        #     make_global = True
 
         # Blender disables the loading of user site-packages by default. However, pip will still check them to determine
         # if a dependency is already installed. This can cause problems if the packages is installed in the user
@@ -225,12 +203,8 @@ def execution_handler(
     activate_bat_path = venv_path / "Scripts" / "activate.bat"
     activate_and_run_path = venv_path / "Scripts" / "activate_and_run.bat"
     python_exe_path = venv_path / "Scripts" / "python.exe"
-    drive = activate_bat_path.drive
 
     sd_interface_path = Path(__file__).parent / "sd_functions.py"
-
-    # for dependency in dependencies[1:]:
-    #     import_module(dependency.name)
 
     # Get args from user_input:
     args_string = " "
@@ -241,7 +215,6 @@ def execution_handler(
         args_string += f"""--{arg_name} "{arg_value}" """
 
     commands = [
-        # f"""{drive}""",  # Triple quotes so we can include double quotes in commands.
         f"""
             "{python_exe_path}" "{sd_interface_path}" {operation_function}{args_string} 
             """,  # NOTE: "operation_function" is the name of the function in sd_interface.py given to the command line.
@@ -264,20 +237,11 @@ def execution_handler(
         )
     except subprocess.CalledProcessError as e:
         raise e
-    #     return output
-    # if not output:
-    #     subprocess.run(
-    #         activate_bat_path,
-    #     )
 
 
 def import_modules(venv_path: str):
     for module_name in dependencies:
         import_module(module_name)
-    # site_packages_path = venv_path / "Lib" / "site-packages"
-    # sys.path.insert(
-    #     0, site_packages_path.as_posix()
-    # )  # HACK Ugly but working way to import installed packages
 
 
 def import_module(module_name):
@@ -288,11 +252,6 @@ def import_module(module_name):
     """
     
     pm.add_venv_path_visibility()
-    # if module_name in globals():
-        # importlib.reload(globals()[module_name])
-    # else:
-        # Attempt to import the module and assign it to globals dictionary. This allows to access the module
-        # under the given name, just like the regular import would.
     globals()[module_name] = importlib.import_module(module_name)
 
 def check_drive_space(path: str = os.getcwd()):

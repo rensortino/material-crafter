@@ -80,6 +80,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
     bl_options = {"REGISTER", "INTERNAL"}
     
     def invoke(self, context, event):
+        msg = "This will install python packages. It will take several minutes, depending on your connection speed."
         if dependencies_installed:
             msg = "Dependencies are already installed. Are you sure you want to reinstall all packages?"
         return context.window_manager.invoke_confirm(self, event, message=msg)
@@ -119,24 +120,6 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         except (subprocess.CalledProcessError, ImportError) as err:
             self.report({"ERROR"}, str(err))
             return {"CANCELLED"}
-
-        # self.report({"INFO"}, "Dependencies installed successfully")
-
-        # try:
-        #     from diffusers import StableDiffusionPipeline
-        #     import torch
-
-        #     self.report({"INFO"}, "Retrieving model from local cache or hub")
-        #     StableDiffusionPipeline.from_pretrained(
-        #         model_id, torch_dtype=torch.float16, trust_remote_code=True
-        #     )
-        #     self.report({"INFO"}, "Stable Diffusion successfully installed.")
-        #     pass
-
-        # except Exception as err:
-        #     self.report({"ERROR"}, str(err))
-        #     return {"CANCELLED"}
-
 
         set_dependencies_installed(True)
         
@@ -260,7 +243,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
     save_path: bpy.props.StringProperty(
         name="Save Path",
         description="Save path",
-        default=f"/tmp\\",
+        default=pm.named_paths['texture_output'].as_posix(),
         maxlen=1024,
         subtype="DIR_PATH",
     )
@@ -356,7 +339,7 @@ class CreateTextures(bpy.types.Operator):
             "name": bpy.context.scene.input_tool.dir_name,
             "prompt": bpy.context.scene.input_tool.prompt,
             "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
-            "model_path": bpy.context.scene.input_tool.prompt,
+            "model_path": bpy.context.scene.input_tool.model_id,
             "precision": bpy.context.scene.input_tool.precision,
             "device": bpy.context.scene.input_tool.device,
         }
@@ -368,15 +351,11 @@ class CreateTextures(bpy.types.Operator):
             "num_inference_steps": bpy.context.scene.input_tool.num_steps,
             #TODO Add scheduler selection 
         }
- 
-        if not user_input["save_path"]:
-            user_input["save_path"] = tempfile.gettempdir()
-        if user_input["save_path"] == "/tmp\\":
-            user_input["save_path"] = tempfile.gettempdir()
         
         try:
             helpers.execution_handler(venv_path, "text2img", {**user_input, **sd_kwargs})
             load_texture_maps(Path(user_input['save_path']), user_input['name'])
+            pm.update_named_paths(user_input["save_path"], "texture_output")
             self.report({"INFO"}, f"New Material Created!")
         except subprocess.CalledProcessError as e:
             print(e)
@@ -517,27 +496,20 @@ def register():
     bpy.types.Scene.input_tool_pre = bpy.props.PointerProperty(
         type=MF_PGT_Input_Properties_Pre
     )
-    
-    
-    if not helpers.dependencies_installed():
-        set_dependencies_installed(False)
-        return
 
     if pm.paths_file_exists():
-        pm.load_paths_file()        
-        set_dependencies_installed(True)
-        venv_path = pm.named_paths["venv"]
+        pm.load_paths_file()
         
+    if pm.named_paths['venv'].exists():
+        set_dependencies_installed(True)
+        
+    for cls in classes:
+        bpy.utils.register_class(cls)
 
-        for cls in classes:
-            bpy.utils.register_class(cls)
-
-        bpy.types.Scene.input_tool = bpy.props.PointerProperty(
-            type=MF_PGT_Input_Properties
-        )
-
-        helpers.import_modules(venv_path)
-        return
+    bpy.types.Scene.input_tool = bpy.props.PointerProperty(
+        type=MF_PGT_Input_Properties
+    )
+    return
 
 
 def unregister():

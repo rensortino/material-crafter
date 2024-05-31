@@ -15,7 +15,6 @@ class SDInterfaceCommands(object):
                 device: str,
                 **kwargs
                 ):
-        # img = Image.open(img_path)
         save_dir = Path(save_path) / name
         save_dir.mkdir(exist_ok=True, parents=True)
 
@@ -42,14 +41,9 @@ class SDInterfaceCommands(object):
         pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config)
 
         with torch.inference_mode():
-            #TODO Parameterize all SD parameters
             image = pipe(
                 prompt,
                 **kwargs
-                # guidance_scale=6.0,
-                # height=256,
-                # width=256,
-                # num_inference_steps=25,
             ).images[0]
             
         image.basecolor.save(save_dir / "basecolor.png")
