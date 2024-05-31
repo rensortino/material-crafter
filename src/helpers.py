@@ -62,25 +62,8 @@ pm = PathManager()
 # set to None, if they are equal to the module name. See import_module and ensure_and_import_module for the explanation
 # of the arguments. DO NOT use this to import other parts of this Python add-on, see "Local modules" above for examples.
 
-dependencies = {
-    "numpy": {"extra_params": []},
-    "diffusers": {"extra_params": []},
-    "transformers": {"extra_params": []},
-    "accelerate": {"extra_params": []},
-    "fire": {"extra_params": []},
-    "xformers": {
-        "version": "0.0.25.post1",
-        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
-        },
-    "torch": {
-        "version": "2.2.2",
-        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121", "--upgrade"],
-    },
-    "torchvision": {
-        "version": "0.17.2",
-        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
-    },
-}
+with open(pm.paths_file.parent / "requirements.json") as f:
+    dependencies = json.load(f)
 
 dependencies_installed = False
 
@@ -99,8 +82,6 @@ def dependencies_installed() -> bool:
         return False
     
 def is_installed(dependency):
-    # if importlib.util.find_spec(dependency):
-    #     return True
     try:
         import_module(dependency)
         return True
