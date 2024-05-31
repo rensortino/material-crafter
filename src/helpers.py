@@ -70,21 +70,22 @@ pm = PathManager()
 
 dependencies = {
     "numpy": {"extra_params": []},
+    "diffusers": {"extra_params": []},
+    "transformers": {"extra_params": []},
+    "accelerate": {"extra_params": []},
+    "fire": {"extra_params": []},
+    "xformers": {
+        "version": "0.0.25.post1",
+        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
+        },
     "torch": {
         "version": "2.2.2",
-        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
+        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121", "--upgrade"],
     },
     "torchvision": {
         "version": "0.17.2",
         "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
     },
-    "xformers": {
-        "extra_params": ["--index-url", "https://download.pytorch.org/whl/cu121"],
-        },
-    "fire": {"extra_params": []},
-    "diffusers": {"extra_params": []},
-    "transformers": {"extra_params": []},
-    "accelerate": {"extra_params": []},
 }
 
 dependencies_installed = False
