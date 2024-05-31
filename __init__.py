@@ -92,7 +92,6 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         )
         
         venv_path = matforger_path / "venv"
-        model_id = helpers.model_id
 
         # Install pip:
         helpers.install_pip()
@@ -156,36 +155,6 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        matforger_path = (
-            Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
-        )
-        return not matforger_path.exists()
-
-    def draw(self, context):
-        layout = self.layout
-
-        lines = [
-            f"Please install the missing dependencies for the \"{bl_info.get('name')}\" add-on.",
-            f"1. Open Edit > Preferences > Add-ons.",
-            f"2. Search for the \"{bl_info.get('name')}\" add-on.",
-            f'3. Under "Preferences" click on the "{MFPRE_OT_install_dependencies.bl_label}"',
-            f"   button. This will download and install the missing Python packages,",
-            f"   if Blender has the required permissions. If you are experiencing issues,",
-            f"   re-open Blender with Administrator privileges.",
-        ]
-
-        for line in lines:
-            layout.label(text=line)
-
-class MF_PT_model_warning_panel(bpy.types.Panel):
-    bl_label = "MatForger Model Warning"
-    bl_category = "MatForger"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-
-    @classmethod
-    def poll(cls, context):
-        if pm.named_paths['model']
         matforger_path = (
             Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
         )
@@ -291,6 +260,14 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         subtype="DIR_PATH",
     )
 
+    model_id: bpy.props.EnumProperty(
+        name="Model ID",
+        description="Select main model for generation.",
+        items=[
+            ("gvecchio/MatForger", "MatForger", "MatForger"),
+        ],
+    )
+
     device: bpy.props.EnumProperty(
         name="Device Type",
         description="Select render device for Stable Diffusion.",
@@ -364,14 +341,13 @@ class CreateTextures(bpy.types.Operator):
         return has_materials
 
     def execute(self, context):
-        model_id = helpers.model_id
         venv_path = pm.named_paths['venv']
 
         user_input = {
             "name": bpy.context.scene.input_tool.dir_name,
             "prompt": bpy.context.scene.input_tool.prompt,
             "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
-            "model_path": model_id,
+            "model_path": bpy.context.scene.input_tool.prompt,
             "fp16": bpy.context.scene.input_tool.fp16,
             "device": bpy.context.scene.input_tool.device,
         }
@@ -423,6 +399,9 @@ class MF_PT_Main(bpy.types.Panel):
         row = layout.row()
         
         row = layout.row()
+        row.prop(input_tool, "model_id")
+        
+        row = layout.row()
         row.prop(input_tool, "fp16")
 
         row = layout.row()
@@ -460,6 +439,29 @@ class MF_PT_Main(bpy.types.Panel):
         row.prop(input_tool, "num_steps")
         
 
+class MF_PT_Model_Warning(bpy.types.Panel):
+    bl_label = "MatForger Model Warning"
+    bl_category = "MatForger"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+
+    @classmethod
+    def poll(cls, context):
+        model_dir_name = f"models--{bpy.context.scene.input_tool.model_id.replace('/', '--')}"
+        model_dir = pm.named_paths['model'] / "hub" / model_dir_name
+        return not model_dir.exists()
+
+    def draw(self, context):
+        layout = self.layout
+        model_dir_name = pm.named_models['model'] / "hub" / f"models--{bpy.context.scene.input_tool.model_id.replace('/', '--')}"
+
+        lines = [
+            f"Weights for {bpy.context.scene.input_tool.model_id} model not found in cache at {model_dir_name}",
+            f"The weights will be donwloaded from Huggingface hub, which may take several minutes, depending on your connection speed."
+        ]
+
+        for line in lines:
+            layout.label(text=line)
 
 class MF_PT_Help(bpy.types.Panel):
     bl_label = "Help"
@@ -489,6 +491,7 @@ classes = (
     # Operator Classes:
     CreateTextures,
     # Panel Classes:
+    MF_PT_Model_Warning,
     MF_PT_Main,
     MF_PT_Help,
 )
