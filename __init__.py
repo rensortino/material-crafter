@@ -11,11 +11,9 @@ bl_info = {
 }
 
 MF_version = bl_info["version"]
-LAST_UPDATED = "Apr 22nd 2024"
+LAST_UPDATED = "May 31st 2024"
 
-# TODO Add choice of cached model path.
 #TODO Refactor
-# FIXME When generating multiple times on the same object, do we add multiple materials to the same object or replace the new ones?
 
 def set_dependencies_installed(are_installed):
     global dependencies_installed
@@ -62,13 +60,6 @@ class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
         maxlen=1024,
         subtype="DIR_PATH",
     )
-    hf_path: bpy.props.StringProperty(
-        name="HF Model Path",
-        description="Where to save MatForger weights.",
-        default=f"{pm.named_paths['model']}",
-        maxlen=1024,
-        subtype="DIR_PATH",
-    )
 
     agree_to_license: bpy.props.BoolProperty(
         name="I agree",
@@ -102,8 +93,6 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         
         venv_path = matforger_path / "venv"
         model_id = helpers.model_id
-        hf_path = bpy.context.scene.input_tool_pre.hf_path
-        os.environ['HF_HOME'] = hf_path
 
         # Install pip:
         helpers.install_pip()
@@ -117,7 +106,6 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         try:
             pm.update_named_paths(matforger_path, "matforger")
             pm.update_named_paths(venv_path, "venv")
-            pm.update_named_paths(Path(hf_path), "model")
             helpers.install_modules(venv_path=venv_path)
 
             self.report({"INFO"}, "Python modules installed successfully.")
@@ -128,28 +116,27 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
             self.report({"ERROR"}, str(err))
             return {"CANCELLED"}
 
-        helpers.import_modules(venv_path)
+        # self.report({"INFO"}, "Dependencies installed successfully")
 
-        try:
-            from diffusers import StableDiffusionPipeline
-            import torch
+        # try:
+        #     from diffusers import StableDiffusionPipeline
+        #     import torch
 
-            self.report({"INFO"}, "Retrieving model from local cache or hub")
-            StableDiffusionPipeline.from_pretrained(
-                model_id, torch_dtype=torch.float16, trust_remote_code=True
-            )
-            self.report({"INFO"}, "Stable Diffusion successfully installed.")
-            pass
+        #     self.report({"INFO"}, "Retrieving model from local cache or hub")
+        #     StableDiffusionPipeline.from_pretrained(
+        #         model_id, torch_dtype=torch.float16, trust_remote_code=True
+        #     )
+        #     self.report({"INFO"}, "Stable Diffusion successfully installed.")
+        #     pass
 
-        except Exception as err:
-            self.report({"ERROR"}, str(err))
-            return {"CANCELLED"}
+        # except Exception as err:
+        #     self.report({"ERROR"}, str(err))
+        #     return {"CANCELLED"}
 
-        self.report({"INFO"}, "Dependencies installed successfully")
 
         set_dependencies_installed(True)
         
-        for mf_cls in classes: #TODO replace with function that takes class list and registers classes if not already done
+        for mf_cls in classes:
             if not mf_cls.is_registered:
                 bpy.utils.register_class(mf_cls)
 
@@ -190,6 +177,36 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
         for line in lines:
             layout.label(text=line)
 
+class MF_PT_model_warning_panel(bpy.types.Panel):
+    bl_label = "MatForger Model Warning"
+    bl_category = "MatForger"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+
+    @classmethod
+    def poll(cls, context):
+        if pm.named_paths['model']
+        matforger_path = (
+            Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
+        )
+        return not matforger_path.exists()
+
+    def draw(self, context):
+        layout = self.layout
+
+        lines = [
+            f"Please install the missing dependencies for the \"{bl_info.get('name')}\" add-on.",
+            f"1. Open Edit > Preferences > Add-ons.",
+            f"2. Search for the \"{bl_info.get('name')}\" add-on.",
+            f'3. Under "Preferences" click on the "{MFPRE_OT_install_dependencies.bl_label}"',
+            f"   button. This will download and install the missing Python packages,",
+            f"   if Blender has the required permissions. If you are experiencing issues,",
+            f"   re-open Blender with Administrator privileges.",
+        ]
+
+        for line in lines:
+            layout.label(text=line)
+
 
 class MFPRE_preferences(bpy.types.AddonPreferences):
     bl_idname = __name__
@@ -201,9 +218,6 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
 
         row = layout.row()
         row.prop(input_tool_pre, "mf_path")
-
-        row = layout.row()
-        row.prop(input_tool_pre, "hf_path")
 
         # Hugging Face and MatForger License agreement:
 
