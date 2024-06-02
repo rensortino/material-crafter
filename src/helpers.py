@@ -54,6 +54,7 @@ class PathManager(object):
 
     def update_named_paths(self, path, path_name = str):
         self.named_paths[path_name] = Path(path)
+        self.save_named_paths()
 
 pm = PathManager()
 # Dependencies
