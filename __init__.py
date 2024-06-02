@@ -25,8 +25,6 @@ import bpy
 # Python modules:
 from pathlib import Path
 import sys
-import os
-import tempfile
 import importlib
 import subprocess
 
@@ -275,6 +273,16 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         ],
     )
 
+    scheduler: bpy.props.EnumProperty(
+        name="Scheduler",
+        default="ddim",
+        description="Diffusion Scheduler.",
+        items=[
+            ("ddim", "DDIM", "DDIM Scheduler"),
+            ("euler", "Euler Discrete", "Euler Discrete"),
+        ],
+    )
+    
     guidance_scale: bpy.props.FloatProperty(
         name="Guidance Scale",
         default=6.0,
@@ -320,7 +328,7 @@ class CreateTextures(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event)
+        return context.window_manager.invoke_confirm(self, event, message="This operation may require several minutes. Make sure to open the Window console before running to keep track of the progress.")
     
     @classmethod
     def poll(cls, context):
@@ -349,9 +357,9 @@ class CreateTextures(bpy.types.Operator):
             "height": bpy.context.scene.input_tool.height,
             "width": bpy.context.scene.input_tool.width,
             "num_inference_steps": bpy.context.scene.input_tool.num_steps,
-            #TODO Add scheduler selection 
+            "scheduler": bpy.context.scene.input_tool.scheduler,
         }
-        
+ 
         try:
             helpers.execution_handler(venv_path, "text2img", {**user_input, **sd_kwargs})
             load_texture_maps(Path(user_input['save_path']), user_input['name'])
@@ -409,10 +417,13 @@ class MF_PT_Main(bpy.types.Panel):
             "mf.create_textures", icon="DISCLOSURE_TRI_RIGHT", text="Create Textures"
         )
         
-        header, body = layout.panel("Diffusion Parameters", default_closed=False)
+        header, body = layout.panel("Diffusion Parameters", default_closed=True)
         
         row = header.row()
         row.label(text="Diffusion Parameters")
+        
+        row = body.row()
+        row.prop(input_tool, "scheduler")
         
         row = body.row()
         row.prop(input_tool, "guidance_scale")
