@@ -161,14 +161,17 @@ def install_modules(
             install_commands_list.extend(extra_params)
 
         print(f"\nInstalling {module_name} to {venv_path}.\n")
+        context.window_manager.progress = (i+1) / len(dependencies)
+        context.window_manager.progress_text = f"Installing {module_name} [{i+1}/{len(dependencies)}]"
+        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1, time_limit=0.0)
         try:
             subprocess.run(install_commands_list, check=True, env=environ_copy)
-            context.window_manager.progress = (i+1) / len(dependencies)
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1, time_limit=0.0)
         except subprocess.CalledProcessError as e:
             print(
                 f"Exception occurred while installing {module_name}: \n\n{e}"
             )
+            context.window_manager.progress_text = f"Error installing {module_name}"
+        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1, time_limit=0.0)
     context.window_manager.progress = 1
 
 

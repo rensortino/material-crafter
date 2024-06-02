@@ -13,6 +13,9 @@ bl_info = {
 MF_version = bl_info["version"]
 LAST_UPDATED = "May 31st 2024"
 
+global installing
+installing = False
+
 #TODO Refactor
 
 def progress_bar(self, context):
@@ -20,7 +23,7 @@ def progress_bar(self, context):
     row.progress(
         factor=context.window_manager.progress,
         type="BAR",
-        text="Operation in progress..." if context.window_manager.progress < 1 else "Operation Finished !"
+        text=context.window_manager.progress_text #if context.window_manager.progress < 1 else "Installation Finished !"
     )
     row.scale_x = 2
 
@@ -99,7 +102,10 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         return bpy.context.scene.input_tool_pre.agree_to_license
 
     def execute(self, context):
-
+        
+        global installing
+        installing = True
+        
         matforger_path = (
             Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
         )
@@ -137,6 +143,8 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         bpy.types.Scene.input_tool = bpy.props.PointerProperty(
             type=MF_PGT_Input_Properties
         )
+        
+        installing = False
 
         return {"FINISHED"}
 
@@ -215,6 +223,9 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
             MFPRE_OT_install_dependencies.bl_idname, icon="CONSOLE"
         )
         
+        if installing:
+            progress_bar(self, context)
+        
         if dependencies_installed and bpy.context.scene.input_tool_pre.agree_to_license:
             row_agree_to_license.enabled = False
             row_dependencies_installed = layout.row()
@@ -243,6 +254,20 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
     prompt: bpy.props.StringProperty(
         name="Prompt", description="Text prompt to generate the texture"
+    )
+    
+    image_prompt: bpy.props.StringProperty(
+        name="Image Prompt", description="Image prompt to generate the texture",
+        subtype="DIR_PATH",
+    )
+    
+    prompt_type: bpy.props.EnumProperty(
+        name="Prompt Type", description="Either prompt text or image for generation",
+        default="text",
+        items=[
+            ("text", "Text", "Text input"),
+            ("image", "Image", "Image input"),
+        ]
     )
 
     save_path: bpy.props.StringProperty(
@@ -352,6 +377,7 @@ class CreateTextures(bpy.types.Operator):
 
         user_input = {
             "name": bpy.context.scene.input_tool.dir_name,
+            "prompt_type": bpy.context.scene.input_tool.prompt_type,
             "prompt": bpy.context.scene.input_tool.prompt,
             "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
             "model_path": bpy.context.scene.input_tool.model_id,
@@ -398,7 +424,14 @@ class MF_PT_Main(bpy.types.Panel):
         """
 
         row = layout.row()
-        row.prop(input_tool, "prompt")
+        row.prop(input_tool, "prompt_type")
+        
+        if input_tool.prompt_type == "text":
+            row = layout.row()
+            row.prop(input_tool, "prompt")
+        elif input_tool.prompt_type == "image":
+            row = layout.row()
+            row.prop(input_tool, "image_prompt")
 
         row = layout.row()
         
@@ -508,8 +541,9 @@ def register():
     global dependencies_installed
     dependencies_installed = False
     
-    # Setup progress variable
+    # Setup progress variables
     bpy.types.WindowManager.progress = bpy.props.FloatProperty()
+    bpy.types.WindowManager.progress_text = bpy.props.StringProperty()
     
     for cls in pre_dependency_classes:
         bpy.utils.register_class(cls)
