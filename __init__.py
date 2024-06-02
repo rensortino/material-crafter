@@ -258,7 +258,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
     
     image_prompt: bpy.props.StringProperty(
         name="Image Prompt", description="Image prompt to generate the texture",
-        subtype="DIR_PATH",
+        subtype="FILE_PATH",
     )
     
     prompt_type: bpy.props.EnumProperty(
@@ -374,11 +374,18 @@ class CreateTextures(bpy.types.Operator):
 
     def execute(self, context):
         venv_path = pm.named_paths['venv']
+        
+        if bpy.context.scene.input_tool.prompt_type == "text":
+            prompt = bpy.context.scene.input_tool.prompt
+        elif bpy.context.scene.input_tool.prompt_type == "image":
+            assert Path(bpy.context.scene.input_tool.prompt).exists(), f"Image prompt path not found at {prompt}"
+            prompt = bpy.context.scene.input_tool.image_prompt
+            
 
         user_input = {
             "name": bpy.context.scene.input_tool.dir_name,
+            "prompt": prompt,
             "prompt_type": bpy.context.scene.input_tool.prompt_type,
-            "prompt": bpy.context.scene.input_tool.prompt,
             "save_path": Path(bpy.path.abspath(bpy.context.scene.input_tool.save_path)),
             "model_path": bpy.context.scene.input_tool.model_id,
             "precision": bpy.context.scene.input_tool.precision,
@@ -394,7 +401,7 @@ class CreateTextures(bpy.types.Operator):
         }
  
         try:
-            helpers.execution_handler(venv_path, "text2img", {**user_input, **sd_kwargs})
+            helpers.execution_handler(venv_path, "generate", {**user_input, **sd_kwargs})
             load_texture_maps(Path(user_input['save_path']), user_input['name'])
             pm.update_named_paths(user_input["save_path"], "texture_output")
             self.report({"INFO"}, f"New Material Created!")

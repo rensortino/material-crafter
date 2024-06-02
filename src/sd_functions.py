@@ -3,11 +3,13 @@ from diffusers import DiffusionPipeline, EulerDiscreteScheduler, DDIMScheduler
 import fire
 from pathlib import Path
 import torch
+from PIL import Image
 
 
 class SDInterfaceCommands(object):
-    def text2img(self,
+    def generate(self,
                 name: str,
+                prompt_type: str,
                 prompt: str,
                 save_path: Path,
                 model_path: str,
@@ -17,6 +19,12 @@ class SDInterfaceCommands(object):
                 ):
         save_dir = Path(save_path) / name
         save_dir.mkdir(exist_ok=True, parents=True)
+        
+        if prompt_type == "text":
+            prompt = prompt
+        elif prompt_type == "image":
+            assert Path(prompt).exists(), f"Image prompt path not found at {prompt}"
+            prompt = Image.open(prompt).resize((512,512))
 
         if precision == "fp32":
             torch_dtype = torch.float32
@@ -41,7 +49,7 @@ class SDInterfaceCommands(object):
         
         scheduler = kwargs.pop("scheduler", "ddim")
         if scheduler == "ddim":
-            pipe.scheduler = DDIMScheduler.from_config*pipe.scheduler.config
+            pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
         elif scheduler == "euler":
             pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config)
         else:
