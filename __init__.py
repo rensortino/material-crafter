@@ -280,7 +280,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
     model_id: bpy.props.EnumProperty(
         name="Model ID",
-        description="Select main model for generation.",
+        description="Select main model for generation",
         items=[
             ("gvecchio/MatForger", "MatForger", "MatForger"),
         ],
@@ -288,7 +288,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
     device: bpy.props.EnumProperty(
         name="Device Type",
-        description="Select render device for Stable Diffusion.",
+        description="Select render device for Stable Diffusion",
         items=[
             ("cuda", "Cuda (GPU)", "Render with Cuda (GPU)"),
             ("cpu", "CPU", "Render with CPU"),
@@ -321,7 +321,19 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         step=0.1,
         max=20.0,
         min=0.0,
-        description="Classifier-free Guidance scale factor.",
+        description="Classifier-free Guidance scale factor",
+    )
+    
+    tileable: bpy.props.BoolProperty(
+        name="Tileable",
+        default=True,
+        description="Generate a tileable material",
+    )
+    
+    patched: bpy.props.BoolProperty(
+        name="Patched",
+        default=False,
+        description="Enables patched diffusion. Reduces memory consumption when working with high resolutions but can affect quality",
     )
 
     height: bpy.props.IntProperty(
@@ -330,7 +342,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         step=32,
         min=128,
         max=4096,
-        description="Height of the generated textures (higher sizes consume more memory).",
+        description="Height of the generated textures (higher sizes consume more memory)",
     )
     
     width: bpy.props.IntProperty(
@@ -339,7 +351,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         step=32,
         min=128,
         max=4096,
-        description="Width of the generated textures (higher sizes consume more memory).",
+        description="Width of the generated textures (higher sizes consume more memory)",
     )
 
     num_steps: bpy.props.IntProperty(
@@ -348,7 +360,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
         step=5,
         min=0,
         max=1000,
-        description="Number of diffusion sampling steps.",
+        description="Number of diffusion sampling steps",
     )
 
 
@@ -398,6 +410,8 @@ class CreateTextures(bpy.types.Operator):
             "width": bpy.context.scene.input_tool.width,
             "num_inference_steps": bpy.context.scene.input_tool.num_steps,
             "scheduler": bpy.context.scene.input_tool.scheduler,
+            "tileable": bpy.context.scene.input_tool.tileable,
+            "patched": bpy.context.scene.input_tool.patched,
         }
  
         try:
@@ -458,6 +472,9 @@ class MF_PT_Main(bpy.types.Panel):
         
         row = layout.row()
         row.prop(input_tool, "dir_name")
+        
+        row = layout.row()
+        row.prop(input_tool, "tileable")
 
         layout.separator()
         
@@ -484,6 +501,9 @@ class MF_PT_Main(bpy.types.Panel):
 
         row = body.row()
         row.prop(input_tool, "num_steps")
+        
+        row = body.row()
+        row.prop(input_tool, "patched")
     
 class MF_PT_Model_Warning(bpy.types.Panel):
     bl_label = "MatForger Model Warning"
