@@ -15,6 +15,15 @@ LAST_UPDATED = "May 31st 2024"
 
 #TODO Refactor
 
+def progress_bar(self, context):
+    row = self.layout.row()
+    row.progress(
+        factor=context.window_manager.progress,
+        type="BAR",
+        text="Operation in progress..." if context.window_manager.progress < 1 else "Operation Finished !"
+    )
+    row.scale_x = 2
+
 def set_dependencies_installed(are_installed):
     global dependencies_installed
     dependencies_installed = are_installed
@@ -82,7 +91,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         if dependencies_installed:
             msg = "Dependencies are already installed. Are you sure you want to reinstall all packages?"
         return context.window_manager.invoke_confirm(self, event, message=msg)
-    
+        
     @classmethod
     def poll(cls, context):
         if not bpy.context.scene.input_tool_pre.agree_to_license:
@@ -109,7 +118,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         try:
             pm.update_named_paths(matforger_path, "matforger")
             pm.update_named_paths(venv_path, "venv")
-            helpers.install_modules(venv_path=venv_path)
+            helpers.install_modules(venv_path=venv_path, context=context)
 
             self.report({"INFO"}, "Python modules installed successfully.")
             
@@ -201,13 +210,11 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
         row_agree_to_license.alignment = "CENTER"
         row_agree_to_license.prop(input_tool_pre, "agree_to_license")
 
-        # layout.separator()
-
         row_install_dependencies_button = layout.row()
         row_install_dependencies_button.operator(
             MFPRE_OT_install_dependencies.bl_idname, icon="CONSOLE"
         )
-
+        
         if dependencies_installed and bpy.context.scene.input_tool_pre.agree_to_license:
             row_agree_to_license.enabled = False
             row_dependencies_installed = layout.row()
@@ -365,6 +372,7 @@ class CreateTextures(bpy.types.Operator):
             load_texture_maps(Path(user_input['save_path']), user_input['name'])
             pm.update_named_paths(user_input["save_path"], "texture_output")
             self.report({"INFO"}, f"New Material Created!")
+            
         except subprocess.CalledProcessError as e:
             print(e)
             self.report({"ERROR"}, "Running text2img raised an exception:\n {e}")
@@ -436,8 +444,7 @@ class MF_PT_Main(bpy.types.Panel):
 
         row = body.row()
         row.prop(input_tool, "num_steps")
-        
-
+    
 class MF_PT_Model_Warning(bpy.types.Panel):
     bl_label = "MatForger Model Warning"
     bl_category = "MatForger"
@@ -500,6 +507,9 @@ def register():
 
     global dependencies_installed
     dependencies_installed = False
+    
+    # Setup progress variable
+    bpy.types.WindowManager.progress = bpy.props.FloatProperty()
     
     for cls in pre_dependency_classes:
         bpy.utils.register_class(cls)

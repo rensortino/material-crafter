@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-
+import bpy
 
 class PathManager(object):
     """
@@ -111,6 +111,7 @@ def install_pip():
 
 def install_modules(
     venv_path: str,
+    context
 ):
     """
     Installs the package through pip and will attempt to import modules into the Venv, or if make_global = True import
@@ -129,8 +130,8 @@ def install_modules(
     """
 
     print(f"Installing dependencies: {', '.join([i for i in dependencies])}")
-
-    for module_name, module_params in dependencies.items():
+    
+    for i, (module_name, module_params) in enumerate(dependencies.items()):
         if "version" in module_params:
             module_name += f"=={module_params['version']}"
         extra_params = module_params['extra_params']
@@ -162,10 +163,13 @@ def install_modules(
         print(f"\nInstalling {module_name} to {venv_path}.\n")
         try:
             subprocess.run(install_commands_list, check=True, env=environ_copy)
+            context.window_manager.progress = (i+1) / len(dependencies)
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1, time_limit=0.0)
         except subprocess.CalledProcessError as e:
             print(
                 f"Exception occurred while installing {module_name}: \n\n{e}"
             )
+    context.window_manager.progress = 1
 
 
 def execution_handler(
