@@ -1,5 +1,5 @@
 # from PIL import Image
-from diffusers import DiffusionPipeline, EulerDiscreteScheduler
+from diffusers import DiffusionPipeline, EulerDiscreteScheduler, DDIMScheduler
 import fire
 from pathlib import Path
 import torch
@@ -38,8 +38,15 @@ class SDInterfaceCommands(object):
         pipe.enable_freeu(s1=0.9, s2=0.2, b1=1.1, b2=1.2)
         pipe.to(device)
         pipe.enable_xformers_memory_efficient_attention() 
-        pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config)
-
+        
+        scheduler = kwargs.pop("scheduler", "ddim")
+        if scheduler == "ddim":
+            pipe.scheduler = DDIMScheduler.from_config*pipe.scheduler.config
+        elif scheduler == "euler":
+            pipe.scheduler = EulerDiscreteScheduler.from_config(pipe.scheduler.config)
+        else:
+            raise NotImplementedError(f"Scheduler {scheduler} not supported")
+        
         with torch.inference_mode():
             image = pipe(
                 prompt,
