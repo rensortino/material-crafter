@@ -398,8 +398,8 @@ class CreateTextures(bpy.types.Operator):
         if bpy.context.scene.input_tool.prompt_type == "text":
             prompt = bpy.context.scene.input_tool.prompt
         elif bpy.context.scene.input_tool.prompt_type == "image":
-            assert Path(bpy.context.scene.input_tool.prompt).exists(), f"Image prompt path not found at {prompt}"
             prompt = bpy.context.scene.input_tool.image_prompt
+            assert Path(prompt).exists(), f"Image prompt path not found at {prompt}"
             
 
         user_input = {
