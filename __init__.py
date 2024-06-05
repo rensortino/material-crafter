@@ -10,6 +10,8 @@ bl_info = {
     "category": "Development",
 }
 
+
+
 MF_version = bl_info["version"]
 LAST_UPDATED = "May 31st 2024"
 
@@ -332,8 +334,14 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
     
     patched: bpy.props.BoolProperty(
         name="Patched",
-        default=False,
+        default=True,
         description="Enables patched diffusion. Reduces memory consumption when working with high resolutions but can affect quality",
+    )
+    
+    free_u: bpy.props.BoolProperty(
+        name="Free U",
+        default=False,
+        description="Enables FreeU in diffusers. This may impair the image quality and the map consistency",
     )
 
     height: bpy.props.IntProperty(
@@ -412,6 +420,7 @@ class CreateTextures(bpy.types.Operator):
             "scheduler": bpy.context.scene.input_tool.scheduler,
             "tileable": bpy.context.scene.input_tool.tileable,
             "patched": bpy.context.scene.input_tool.patched,
+            "free_u": bpy.context.scene.input_tool.free_u,
         }
  
         try:
@@ -504,6 +513,9 @@ class MF_PT_Main(bpy.types.Panel):
         
         row = body.row()
         row.prop(input_tool, "patched")
+        
+        row = body.row()
+        row.prop(input_tool, "free_u")
     
 class MF_PT_Model_Warning(bpy.types.Panel):
     bl_label = "MatForger Model Warning"
