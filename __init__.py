@@ -251,7 +251,7 @@ pre_dependency_classes = (
 class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
     dir_name: bpy.props.StringProperty(
-        name="Dir Name", description="Name of the generated texture"
+        name="Name", description="Name of the generated texture"
     )
 
     prompt: bpy.props.StringProperty(
@@ -491,7 +491,7 @@ class MF_PT_Main(bpy.types.Panel):
             "mf.create_textures", icon="DISCLOSURE_TRI_RIGHT", text="Create Textures"
         )
         
-        header, body = layout.panel("Diffusion Parameters", default_closed=True)
+        header, body = layout.panel("Diffusion Parameters", default_closed=False)
         
         row = header.row()
         row.label(text="Diffusion Parameters")
