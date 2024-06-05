@@ -364,7 +364,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
     num_steps: bpy.props.IntProperty(
         name="Steps",
-        default=25,
+        default=50,
         step=5,
         min=0,
         max=1000,
