@@ -3,6 +3,7 @@
 <p align="center">
 <img src="https://img.shields.io/badge/python-v3.8+-blue.svg">
 <img src="https://img.shields.io/badge/blender-v4.1+-orange.svg">
+<img src="https://img.shields.io/badge/cuda-v12.1+-forest.svg">
 </p>
 
 Generate SVBRDF materials using a Latent Diffusion based model, without leaving Blender.
@@ -38,11 +39,16 @@ Generate SVBRDF materials using a Latent Diffusion based model, without leaving 
 
 5. Now, you will find MatForger on the right side of the panel, clicking on the arrow.
 
-6. Specify your prompt and generation parameters and click on `Create Textures`. 
-    
-    **⚠️ NOTE**: before generating texture maps, you need to select an object you want to apply it to.
+![Panel Location](docs/Panel-Location.png)
 
+6. Specify your prompt and generation parameters and click on `Create Textures`. 
+   
 ![Run Generation](docs/Run-Generation.gif)
+
+    
+**⚠️ NOTE**: before generating texture maps, you need to select an object you want to apply it to.
+
+![Invalid Object](docs/Invalid-Object.png)
 
 7. Now you material should be applied to your selected object. If you want to see your texture maps, they are also saved in a local folder, specified in the input field.
 
