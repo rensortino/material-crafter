@@ -37,7 +37,7 @@ Generate SVBRDF materials using a Latent Diffusion based model, without leaving 
 
 ![Install Dependencies](docs/Install-dependencies.gif)
 
-1. Now, you will find Material Crafter on the right side of the panel, clicking on the arrow.
+5. Now, you will find Material Crafter on the right side of the panel, clicking on the arrow.
 
 ![Panel Location](docs/Panel-Location.png)
 
