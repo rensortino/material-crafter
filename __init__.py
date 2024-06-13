@@ -1,9 +1,9 @@
 bl_info = {
-    "name": "MatForger",
+    "name": "Material Crafter",
     "author": "Renato Sortino, Giuseppe Vecchio",
     "version": (1, 0, 0),
     "blender": (4, 1, 0),
-    "location": "View3D > Sidebar > MatForger",
+    "location": "View3D > Sidebar > Material Crafter",
     "description": "Add on for generating texture maps using diffusion models.",
     "support": "COMMUNITY",
     "warning": "Requires installation of dependencies and works best with a GPU",
@@ -12,8 +12,8 @@ bl_info = {
 
 
 
-MF_version = bl_info["version"]
-LAST_UPDATED = "May 31st 2024"
+MC_version = bl_info["version"]
+LAST_UPDATED = "Jun 13rd 2024"
 
 global installing
 installing = False
@@ -61,14 +61,14 @@ if "bpy" in locals():
 pm = helpers.PathManager()
 
 # ======== Pre Dependency =================== #
-class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
+class MC_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
     # Install Dependencies panel:
-    mf_path: bpy.props.StringProperty(
-        name="MatForger Path",
+    mc_path: bpy.props.StringProperty(
+        name="Material Crafter Path",
         description="The save path for the virtual environments. If you have already "
-        "installed MatForger, or you are using a different version of Blender, you can use your"
+        "installed Material Crafter, or you are using a different version of Blender, you can use your"
         " old Environment Path. Regardless of the method, always initiate your Environment.",
-        default=f"{pm.named_paths['matforger'].parent}",
+        default=f"{pm.named_paths['material_crafter'].parent}",
         maxlen=1024,
         subtype="DIR_PATH",
     )
@@ -76,13 +76,13 @@ class MF_PGT_Input_Properties_Pre(bpy.types.PropertyGroup):
     agree_to_license: bpy.props.BoolProperty(
         name="I agree",
         default=False,
-        description="I agree to the MatForger License and the Hugging Face Stable Diffusion License.",
+        description="I agree to the Material Crafter License and the Hugging Face Stable Diffusion License.",
     )
 
 
 # # ======== Pre-Dependency Operators ======== #
-class MFPRE_OT_install_dependencies(bpy.types.Operator):
-    bl_idname = "mf.install_dependencies"
+class MCPRE_OT_install_dependencies(bpy.types.Operator):
+    bl_idname = "mc.install_dependencies"
     bl_label = "Install dependencies"
     bl_description = (
         "Downloads and installs the required python packages for this add-on. "
@@ -108,11 +108,11 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
         global installing
         installing = True
         
-        matforger_path = (
-            Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
+        mc_path = (
+            Path(bpy.context.scene.input_tool_pre.mc_path) / "Material-Crafter-Add-on"
         )
         
-        venv_path = matforger_path / "venv"
+        venv_path = mc_path / "venv"
 
         # Install pip:
         helpers.install_pip()
@@ -124,7 +124,7 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         # Importing dependencies
         try:
-            pm.update_named_paths(matforger_path, "matforger")
+            pm.update_named_paths(mc_path, "material_crafter")
             pm.update_named_paths(venv_path, "venv")
             helpers.install_modules(venv_path=venv_path, context=context)
 
@@ -138,12 +138,12 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
         set_dependencies_installed(True)
         
-        for mf_cls in classes:
-            if not mf_cls.is_registered:
-                bpy.utils.register_class(mf_cls)
+        for mc_cls in classes:
+            if not mc_cls.is_registered:
+                bpy.utils.register_class(mc_cls)
 
         bpy.types.Scene.input_tool = bpy.props.PointerProperty(
-            type=MF_PGT_Input_Properties
+            type=MC_PGT_Input_Properties
         )
         
         installing = False
@@ -152,18 +152,18 @@ class MFPRE_OT_install_dependencies(bpy.types.Operator):
 
 
 # ======== Pre-Dependency UI Panels ======== #
-class MFPRE_PT_warning_panel(bpy.types.Panel):
-    bl_label = "MatForger Warning"
-    bl_category = "MatForger"
+class MCPRE_PT_warning_panel(bpy.types.Panel):
+    bl_label = "Material Crafter Warning"
+    bl_category = "Material Crafter"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
 
     @classmethod
     def poll(cls, context):
-        matforger_path = (
-            Path(bpy.context.scene.input_tool_pre.mf_path) / "MatForger-Add-on"
+        mc_path = (
+            Path(bpy.context.scene.input_tool_pre.mc_path) / "Material-Crafter-Add-on"
         )
-        return not matforger_path.exists()
+        return not mc_path.exists()
 
     def draw(self, context):
         layout = self.layout
@@ -172,7 +172,7 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
             f"Please install the missing dependencies for the \"{bl_info.get('name')}\" add-on.",
             f"1. Open Edit > Preferences > Add-ons.",
             f"2. Search for the \"{bl_info.get('name')}\" add-on.",
-            f'3. Under "Preferences" click on the "{MFPRE_OT_install_dependencies.bl_label}"',
+            f'3. Under "Preferences" click on the "{MCPRE_OT_install_dependencies.bl_label}"',
             f"   button. This will download and install the missing Python packages,",
             f"   if Blender has the required permissions. If you are experiencing issues,",
             f"   re-open Blender with Administrator privileges.",
@@ -182,7 +182,7 @@ class MFPRE_PT_warning_panel(bpy.types.Panel):
             layout.label(text=line)
 
 
-class MFPRE_preferences(bpy.types.AddonPreferences):
+class MCPRE_preferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
     def draw(self, context):
@@ -191,9 +191,9 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
         input_tool_pre = scene.input_tool_pre
 
         row = layout.row()
-        row.prop(input_tool_pre, "mf_path")
+        row.prop(input_tool_pre, "mc_path")
 
-        # Hugging Face and MatForger License agreement:
+        # Hugging Face and Material Crafter License agreement:
 
         # This line represents the character space readable in Blender's UI system:
         #         |=======================================================================|
@@ -213,7 +213,7 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
 
         row = layout.row()
         row.operator(
-            "wm.url_open", text="MatForger License (OpenRAIL)", icon="HELP"
+            "wm.url_open", text="Material Crafter License (OpenRAIL)", icon="HELP"
         ).url = "https://huggingface.co/blog/open_rail"
 
         row_agree_to_license = layout.row()
@@ -222,7 +222,7 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
 
         row_install_dependencies_button = layout.row()
         row_install_dependencies_button.operator(
-            MFPRE_OT_install_dependencies.bl_idname, icon="CONSOLE"
+            MCPRE_OT_install_dependencies.bl_idname, icon="CONSOLE"
         )
         
         if installing:
@@ -238,17 +238,17 @@ class MFPRE_preferences(bpy.types.AddonPreferences):
 
 pre_dependency_classes = (
     # Property Group Classes:
-    MF_PGT_Input_Properties_Pre,
+    MC_PGT_Input_Properties_Pre,
     # Operator Classes:
-    MFPRE_OT_install_dependencies,
+    MCPRE_OT_install_dependencies,
     # Panel Classes
-    MFPRE_preferences,
-    MFPRE_PT_warning_panel,
+    MCPRE_preferences,
+    MCPRE_PT_warning_panel,
 )
 
 
 # ======== User input Property Group ======== #
-class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
+class MC_PGT_Input_Properties(bpy.types.PropertyGroup):
 
     dir_name: bpy.props.StringProperty(
         name="Name", description="Name of the generated texture"
@@ -374,7 +374,7 @@ class MF_PGT_Input_Properties(bpy.types.PropertyGroup):
 
 # ======== Operators ======== #
 class CreateTextures(bpy.types.Operator):
-    bl_idname = "mf.create_textures"
+    bl_idname = "mc.create_textures"
     bl_label = "Create Textures"
     bl_description = "Creates textures with Stable Diffusion by using the Texture Description as text input."
     bl_options = {"REGISTER", "UNDO"}
@@ -437,12 +437,12 @@ class CreateTextures(bpy.types.Operator):
 
 
 # ======== UI Panels ======== #
-class MF_PT_Main(bpy.types.Panel):
-    bl_label = "MatForger"
-    bl_idname = "MF_PT_Main"
+class MC_PT_Main(bpy.types.Panel):
+    bl_label = "Material Crafter"
+    bl_idname = "MC_PT_Main"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "MatForger"
+    bl_category = "Material Crafter"
 
     def draw(self, context):
         layout = self.layout
@@ -450,7 +450,7 @@ class MF_PT_Main(bpy.types.Panel):
         input_tool = scene.input_tool
 
         """
-        The Main panel for MatForger.
+        The Main panel for Material Crafter.
         """
 
         row = layout.row()
@@ -488,7 +488,7 @@ class MF_PT_Main(bpy.types.Panel):
         layout.separator()
         
         layout.operator(
-            "mf.create_textures", icon="DISCLOSURE_TRI_RIGHT", text="Create Textures"
+            "mc.create_textures", icon="DISCLOSURE_TRI_RIGHT", text="Create Textures"
         )
         
         header, body = layout.panel("Diffusion Parameters", default_closed=False)
@@ -517,9 +517,9 @@ class MF_PT_Main(bpy.types.Panel):
         row = body.row()
         row.prop(input_tool, "free_u")
     
-class MF_PT_Model_Warning(bpy.types.Panel):
-    bl_label = "MatForger Model Warning"
-    bl_category = "MatForger"
+class MC_PT_Model_Warning(bpy.types.Panel):
+    bl_label = "Material Crafter Warning"
+    bl_category = "Material Crafter"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
 
@@ -541,12 +541,12 @@ class MF_PT_Model_Warning(bpy.types.Panel):
         for line in lines:
             layout.label(text=line)
 
-class MF_PT_Help(bpy.types.Panel):
+class MC_PT_Help(bpy.types.Panel):
     bl_label = "Help"
-    bl_idname = "MF_PT_Help"
+    bl_idname = "MC_PT_Help"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "MatForger"
+    bl_category = "Material Crafter"
 
     def draw(self, context):
         layout = self.layout
@@ -559,19 +559,19 @@ class MF_PT_Help(bpy.types.Panel):
         row = layout.row()
 
         row = layout.row()
-        layout.label(text=f"{MF_version}, {LAST_UPDATED}")
+        layout.label(text=f"{MC_version}, {LAST_UPDATED}")
 
 
 # ======== Blender add-on register/unregister handling ======== #
 classes = (
     # Property Group Classes:
-    MF_PGT_Input_Properties,
+    MC_PGT_Input_Properties,
     # Operator Classes:
     CreateTextures,
     # Panel Classes:
-    MF_PT_Model_Warning,
-    MF_PT_Main,
-    MF_PT_Help,
+    MC_PT_Model_Warning,
+    MC_PT_Main,
+    MC_PT_Help,
 )
 
 
@@ -588,7 +588,7 @@ def register():
         bpy.utils.register_class(cls)
 
     bpy.types.Scene.input_tool_pre = bpy.props.PointerProperty(
-        type=MF_PGT_Input_Properties_Pre
+        type=MC_PGT_Input_Properties_Pre
     )
 
     if pm.paths_file_exists():
@@ -601,7 +601,7 @@ def register():
         bpy.utils.register_class(cls)
 
     bpy.types.Scene.input_tool = bpy.props.PointerProperty(
-        type=MF_PGT_Input_Properties
+        type=MC_PGT_Input_Properties
     )
     return
 

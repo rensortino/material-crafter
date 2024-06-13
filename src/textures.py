@@ -17,7 +17,7 @@ def load_map_image(node, img_path, name, colorspace="sRGB"):
 
 def load_texture_maps(mat_dir, mat_name):
     mat_dir = mat_dir / mat_name
-    mat_name = f"M_MF_{mat_name}"
+    mat_name = f"M_MC_{mat_name}"
     material = bpy.data.materials.new(mat_name)
 
     # Set node tree editing

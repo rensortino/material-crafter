@@ -14,11 +14,11 @@ class PathManager(object):
 
     def __init__(self, paths_file_name: str = "paths.json"):
         self.named_paths = {
-            "matforger": self.default_path,
+            "material_crafter": self.default_path,
             "model": Path.home() / ".cache/huggingface",
             "texture_output": Path.home() / ".tmp"
         }
-        self.named_paths["venv"] = self.named_paths['matforger'] / "venv"
+        self.named_paths["venv"] = self.named_paths['material_crafter'] / "venv"
         directory = Path(__file__).parent
         self.paths_file = Path(directory.parent / paths_file_name)
         self.load_paths_file()
@@ -185,7 +185,7 @@ def execution_handler(
     we must input the commands into the activate.bat file, then run the file with Subprocess.
 
     This file controls the interactions with the activate.bat file, it opens, modifies, and runs the files depending on
-    what functions are needed by MatForger. Each main function, when called, will activate Stable Diffusion with the
+    what functions are needed by Material Crafter. Each main function, when called, will activate Stable Diffusion with the
     appropriate input variables.
     """
 
