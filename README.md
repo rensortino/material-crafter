@@ -57,7 +57,7 @@ Generate SVBRDF materials using a Latent Diffusion based model, without leaving 
 
 ![View Mode](docs/View-mode.png)
 
-8. You can see in the Shader tab that a new material has been created, named `M_MF_{MATERIAL_NAME}`, and the generated maps have already been assigned their own corresponding node.
+8. You can see in the Shader tab that a new material has been created, named `M_MC_{MATERIAL_NAME}`, and the generated maps have already been assigned their own corresponding node.
 
 ![Shader Tab](docs/Shader-tab.png)
 
