@@ -46,7 +46,7 @@ class SDInterfaceCommands(object):
         pipe.to(device)
         pipe.enable_xformers_memory_efficient_attention()
         
-        free_u = kwargs.pop("free_u")
+        free_u = kwargs.pop("free_u", None)
         if free_u:
             pipe.enable_freeu(s1=0.9, s2=0.2, b1=1.1, b2=1.2)
         
