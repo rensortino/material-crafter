@@ -1,4 +1,4 @@
-<h1 align="center">MatForger Add-on</h1>
+<h1 align="center">Material Crafter</h1>
 
 <p align="center">
 <img src="https://img.shields.io/badge/python-v3.8+-blue.svg">
@@ -10,7 +10,7 @@ Generate SVBRDF materials using a Latent Diffusion based model, without leaving 
 
 ## Minimum requirements
 
--  [Python 3.8+](https://www.python.org/downloads/)
+- [Python 3.8+](https://www.python.org/downloads/)
 - [Blender 4.1+](https://www.blender.org/download/)
 - [CUDA drivers 12.1+](https://developer.nvidia.com/cuda-downloads)
 - 4GB+ NVIDIA GPU
@@ -37,7 +37,7 @@ Generate SVBRDF materials using a Latent Diffusion based model, without leaving 
 
 ![Install Dependencies](docs/Install-dependencies.gif)
 
-5. Now, you will find MatForger on the right side of the panel, clicking on the arrow.
+1. Now, you will find Material Crafter on the right side of the panel, clicking on the arrow.
 
 ![Panel Location](docs/Panel-Location.png)
 
