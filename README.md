@@ -6,7 +6,9 @@
 <img src="https://img.shields.io/badge/cuda-v12.1+-forest.svg">
 </p>
 
-Generate SVBRDF materials using a Latent Diffusion based model, without leaving Blender.
+<img src="docs\Teaser.gif">
+
+Generate SVBRDF materials using Latent Diffusion Models, without leaving Blender.
 
 ## Minimum requirements
 
