@@ -284,7 +284,7 @@ class MC_PGT_Input_Properties(bpy.types.PropertyGroup):
         name="Model ID",
         description="Select main model for generation",
         items=[
-            ("gvecchio/MatForger", "MatForger", "MatForger"),
+            ("gvecchio/MatForger", "gvecchio/MatForger", "MatForger"),
         ],
     )
 

@@ -39,7 +39,7 @@ Generate SVBRDF materials using Latent Diffusion Models, without leaving Blender
 
 ![Install Dependencies](docs/Install-dependencies.gif)
 
-1. Now, you will find Material Crafter on the right side of the panel, clicking on the arrow.
+5. Now, you will find Material Crafter on the right side of the panel, clicking on the arrow.
 
 ![Panel Location](docs/Panel-Location.png)
 
@@ -59,7 +59,7 @@ Generate SVBRDF materials using Latent Diffusion Models, without leaving Blender
 
 ![View Mode](docs/View-mode.png)
 
-8. You can see in the Shader tab that a new material has been created, named `M_MF_{MATERIAL_NAME}`, and the generated maps have already been assigned their own corresponding node.
+8. You can see in the Shader tab that a new material has been created, named `M_MC_{MATERIAL_NAME}`, and the generated maps have already been assigned their own corresponding node.
 
 ![Shader Tab](docs/Shader-tab.png)
 
